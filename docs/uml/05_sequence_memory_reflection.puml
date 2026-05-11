@@ -1,0 +1,76 @@
+@startuml Sequence – Memory & Reflection
+title TradingAgents — Deferred Reflection & Memory Lifecycle
+
+skinparam responseMessageBelowArrow true
+
+actor User
+participant "TradingAgentsGraph" as TAG
+participant "TradingMemoryLog\n(markdown file)" as MEM
+participant "Reflector" as REF
+participant "LLM\n(quick_think)" as LLM
+participant "yfinance\n(returns data)" as YF
+
+== Run N: First decision for AAPL ==
+
+User -> TAG : propagate("AAPL", "2025-01-10")
+TAG -> MEM : get_pending_entries()  ← no prior entries
+MEM --> TAG : []
+TAG -> MEM : get_past_context("AAPL")
+MEM --> TAG : "" (empty — first run)
+
+TAG -> TAG : [graph executes — produces PortfolioDecision]
+
+TAG -> MEM : store_decision(\n  ticker="AAPL",\n  date="2025-01-10",\n  signal="Buy",\n  decision=pm_text,\n  reasoning=rationale\n)
+note right of MEM
+  Appends to markdown log:
+  ## [PENDING] AAPL 2025-01-10
+  **Signal:** Buy
+  **Decision:** ...
+  **Reasoning:** ...
+end note
+
+TAG --> User : (final_state, {"signal": "Buy"})
+
+== Run N+1: Next AAPL run (days/weeks later) ==
+
+User -> TAG : propagate("AAPL", "2025-02-14")
+
+TAG -> MEM : get_pending_entries()
+MEM --> TAG : [{id, ticker="AAPL", date="2025-01-10", signal="Buy", decision, reasoning}]
+
+group Deferred Reflection for 2025-01-10 entry
+  TAG -> YF : fetch price on 2025-01-10 and 2025-02-14
+  YF --> TAG : entry_price=185.40, exit_price=198.20
+  TAG -> TAG : compute raw_return=+6.9%
+  TAG -> YF : fetch SPY return over same window
+  YF --> TAG : spy_return=+3.1%
+  TAG -> TAG : compute alpha=+3.8%
+
+  TAG -> REF : reflect_on_final_decision(\n  decision_text, outcome={raw_return, alpha}\n)
+  REF -> LLM : invoke([system_prompt, decision, outcome])
+  LLM --> REF : "The Buy call was correct; strong momentum...\nLesson: technical breakout + positive sentiment..."
+  REF --> TAG : reflection_text
+
+  TAG -> MEM : batch_update_with_outcomes([{\n  id="AAPL-2025-01-10",\n  outcome={raw_return, alpha},\n  reflection=reflection_text\n}])
+  note right of MEM
+    Replaces [PENDING] with [RESOLVED]:
+    ## [RESOLVED] AAPL 2025-01-10
+    **Outcome:** +6.9% (+3.8% alpha vs SPY)
+    **REFLECTION:** The Buy call was correct...
+  end note
+end
+
+TAG -> MEM : get_past_context("AAPL")
+MEM --> TAG : "## [RESOLVED] AAPL 2025-01-10\n..."
+
+TAG -> TAG : [graph executes with past_context injected into Propagator state]
+note right of TAG
+  Analysts and researchers see
+  prior decisions + outcomes
+  in their system prompts
+end note
+
+TAG -> MEM : store_decision("AAPL", "2025-02-14", ...)
+TAG --> User : (final_state, {"signal": "..."})
+
+@enduml

@@ -1,0 +1,299 @@
+@startuml Class Diagram – Agents & Schemas
+title TradingAgents — Agent Classes & Structured Schemas
+
+skinparam classAttributeIconSize 0
+skinparam groupInheritance 2
+skinparam linetype ortho
+
+' ─── LLM Client Hierarchy ────────────────────────────────────────────────────
+package "llm_clients" {
+  abstract class BaseLLMClient {
+    + provider : str
+    + model : str
+    + {abstract} chat(messages) : str
+    + {abstract} bind_tools(tools) : Runnable
+    + {abstract} with_structured_output(schema) : Runnable
+  }
+
+  class OpenAIClient {
+    + client : ChatOpenAI
+    + chat(messages) : str
+    + bind_tools(tools) : Runnable
+    + with_structured_output(schema) : Runnable
+  }
+
+  class AnthropicClient {
+    + client : ChatAnthropic
+    + chat(messages) : str
+    + bind_tools(tools) : Runnable
+    + with_structured_output(schema) : Runnable
+  }
+
+  class GoogleClient {
+    + client : ChatGoogleGenerativeAI
+    + thinking_level : str
+    + chat(messages) : str
+    + bind_tools(tools) : Runnable
+    + with_structured_output(schema) : Runnable
+  }
+
+  class AzureOpenAIClient {
+    + client : AzureChatOpenAI
+    + chat(messages) : str
+    + bind_tools(tools) : Runnable
+    + with_structured_output(schema) : Runnable
+  }
+
+  class DeepSeekChatOpenAI {
+    + thinking_budget : int
+    + chat(messages) : str
+  }
+
+  BaseLLMClient <|-- OpenAIClient
+  BaseLLMClient <|-- AnthropicClient
+  BaseLLMClient <|-- GoogleClient
+  BaseLLMClient <|-- AzureOpenAIClient
+  OpenAIClient <|-- DeepSeekChatOpenAI
+}
+
+' ─── State Models ─────────────────────────────────────────────────────────────
+package "agents.utils" {
+  class AgentState {
+    + messages : list[BaseMessage]
+    + company_of_interest : str
+    + trade_date : str
+    + sender : str
+    + market_report : str
+    + sentiment_report : str
+    + news_report : str
+    + fundamentals_report : str
+    + investment_plan : str
+    + trader_investment_plan : str
+    + final_trade_decision : str
+    + past_context : str
+    + investment_debate_state : InvestDebateState
+    + risk_debate_state : RiskDebateState
+  }
+
+  class InvestDebateState {
+    + bull_history : str
+    + bear_history : str
+    + history : str
+    + current_response : str
+    + judge_decision : str
+    + count : int
+  }
+
+  class RiskDebateState {
+    + aggressive_history : str
+    + conservative_history : str
+    + neutral_history : str
+    + history : str
+    + latest_speaker : str
+    + current_aggressive_response : str
+    + current_conservative_response : str
+    + current_neutral_response : str
+    + judge_decision : str
+    + count : int
+  }
+
+  class TradingMemoryLog {
+    + log_path : Path
+    + max_entries : Optional[int]
+    + store_decision(ticker, date, signal, decision, reasoning) : None
+    + get_pending_entries() : list[dict]
+    + get_past_context(ticker) : str
+    + batch_update_with_outcomes(updates) : None
+  }
+
+  AgentState *-- InvestDebateState
+  AgentState *-- RiskDebateState
+}
+
+' ─── Structured Output Schemas ────────────────────────────────────────────────
+package "agents.schemas" {
+  enum PortfolioRating {
+    Buy
+    Overweight
+    Hold
+    Underweight
+    Sell
+  }
+
+  enum TraderAction {
+    Buy
+    Hold
+    Sell
+  }
+
+  class ResearchPlan {
+    + recommendation : PortfolioRating
+    + rationale : str
+    + strategic_actions : str
+    + render_research_plan() : str
+  }
+
+  class TraderProposal {
+    + action : TraderAction
+    + reasoning : str
+    + entry_price : Optional[float]
+    + stop_loss : Optional[float]
+    + position_sizing : Optional[str]
+    + render_trader_proposal() : str
+  }
+
+  class PortfolioDecision {
+    + rating : PortfolioRating
+    + executive_summary : str
+    + investment_thesis : str
+    + price_target : Optional[float]
+    + time_horizon : Optional[str]
+    + render_pm_decision() : str
+  }
+
+  ResearchPlan --> PortfolioRating
+  TraderProposal --> TraderAction
+  PortfolioDecision --> PortfolioRating
+}
+
+' ─── Agent Factory Functions ──────────────────────────────────────────────────
+package "agents.analysts" {
+  class MarketAnalyst <<function factory>> {
+    + llm : BaseLLMClient
+    + tools : list[Tool]
+    + __call__(state: AgentState) : dict
+  }
+  class NewsAnalyst <<function factory>> {
+    + llm : BaseLLMClient
+    + tools : list[Tool]
+    + __call__(state: AgentState) : dict
+  }
+  class FundamentalsAnalyst <<function factory>> {
+    + llm : BaseLLMClient
+    + tools : list[Tool]
+    + __call__(state: AgentState) : dict
+  }
+  class SocialMediaAnalyst <<function factory>> {
+    + llm : BaseLLMClient
+    + tools : list[Tool]
+    + __call__(state: AgentState) : dict
+  }
+}
+
+package "agents.researchers" {
+  class BullResearcher <<function factory>> {
+    + llm : BaseLLMClient
+    + __call__(state: AgentState) : dict
+  }
+  class BearResearcher <<function factory>> {
+    + llm : BaseLLMClient
+    + __call__(state: AgentState) : dict
+  }
+}
+
+package "agents.managers" {
+  class ResearchManager <<function factory>> {
+    + llm : BaseLLMClient
+    + __call__(state: AgentState) : dict
+    ' outputs ResearchPlan via structured output
+  }
+  class PortfolioManager <<function factory>> {
+    + llm : BaseLLMClient
+    + __call__(state: AgentState) : dict
+    ' outputs PortfolioDecision via structured output
+  }
+}
+
+package "agents.trader" {
+  class Trader <<function factory>> {
+    + llm : BaseLLMClient
+    + __call__(state: AgentState) : dict
+    ' outputs TraderProposal via structured output
+  }
+}
+
+package "agents.risk_mgmt" {
+  class AggressiveDebator <<function factory>> {
+    + llm : BaseLLMClient
+    + __call__(state: AgentState) : dict
+  }
+  class ConservativeDebator <<function factory>> {
+    + llm : BaseLLMClient
+    + __call__(state: AgentState) : dict
+  }
+  class NeutralDebator <<function factory>> {
+    + llm : BaseLLMClient
+    + __call__(state: AgentState) : dict
+  }
+}
+
+' ─── Graph Orchestration ──────────────────────────────────────────────────────
+package "graph" {
+  class TradingAgentsGraph {
+    + config : dict
+    + deep_thinking_llm : BaseLLMClient
+    + quick_thinking_llm : BaseLLMClient
+    + tool_nodes : dict[str, ToolNode]
+    + graph : CompiledStateGraph
+    + memory_log : TradingMemoryLog
+    + propagate(ticker: str, date: str) : tuple[dict, dict]
+    - _run_graph(state: AgentState) : AgentState
+    - _resolve_pending_entries(ticker: str, date: str) : None
+    - _log_state(state: dict) : None
+    - reflect_and_remember(ticker, date, signal, decision) : None
+  }
+
+  class GraphSetup {
+    + config : dict
+    + analysts : list[str]
+    + create_workflow(agents, tool_nodes, conditional_logic) : StateGraph
+  }
+
+  class ConditionalLogic {
+    + config : dict
+    + should_continue_market(state) : str
+    + should_continue_social(state) : str
+    + should_continue_news(state) : str
+    + should_continue_fundamentals(state) : str
+    + should_continue_debate(state) : str
+    + should_continue_risk_analysis(state) : str
+  }
+
+  class Propagator {
+    + config : dict
+    + create_initial_state(ticker, date, past_context) : AgentState
+  }
+
+  class Reflector {
+    + llm : BaseLLMClient
+    + reflect_on_final_decision(decision, outcome) : str
+  }
+
+  class SignalProcessor {
+    + process_signal(state: AgentState) : str
+  }
+
+  TradingAgentsGraph *-- GraphSetup
+  TradingAgentsGraph *-- ConditionalLogic
+  TradingAgentsGraph *-- Propagator
+  TradingAgentsGraph *-- Reflector
+  TradingAgentsGraph *-- SignalProcessor
+  TradingAgentsGraph *-- TradingMemoryLog
+  TradingAgentsGraph --> BaseLLMClient
+}
+
+' ─── Cross-package dependencies ───────────────────────────────────────────────
+MarketAnalyst --> BaseLLMClient
+NewsAnalyst --> BaseLLMClient
+FundamentalsAnalyst --> BaseLLMClient
+SocialMediaAnalyst --> BaseLLMClient
+BullResearcher --> BaseLLMClient
+BearResearcher --> BaseLLMClient
+ResearchManager --> BaseLLMClient
+ResearchManager ..> ResearchPlan : produces
+Trader --> BaseLLMClient
+Trader ..> TraderProposal : produces
+PortfolioManager --> BaseLLMClient
+PortfolioManager ..> PortfolioDecision : produces
+
+@enduml

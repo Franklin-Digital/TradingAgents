@@ -1,0 +1,88 @@
+@startuml Sequence – Investment & Risk Debates
+title TradingAgents — Debate Sequences (Investment + Risk)
+
+skinparam responseMessageBelowArrow true
+
+participant "LangGraph" as G
+participant "BullResearcher" as BULL
+participant "BearResearcher" as BEAR
+participant "ResearchManager" as RM
+participant "LLM\n(deep_think)" as LLM1
+participant "Trader" as TR
+participant "AggressiveDebator" as AGG
+participant "ConservativeDebator" as CON
+participant "NeutralDebator" as NEU
+participant "PortfolioManager" as PM
+participant "LLM\n(quick_think)" as LLM2
+
+== Investment Debate (max_debate_rounds iterations) ==
+
+loop Round 1..N  [count < max_debate_rounds]
+  G -> BULL : bull_researcher(state)
+  activate BULL
+  BULL -> LLM1 : invoke([system_prompt, bear_history, market_reports...])
+  LLM1 --> BULL : bull argument text
+  BULL --> G : {investment_debate_state.bull_history += response,\n count += 1}
+  deactivate BULL
+
+  G -> BEAR : bear_researcher(state)
+  activate BEAR
+  BEAR -> LLM1 : invoke([system_prompt, bull_history, market_reports...])
+  LLM1 --> BEAR : bear argument text
+  BEAR --> G : {investment_debate_state.bear_history += response,\n count += 1}
+  deactivate BEAR
+
+  note over G : ConditionalLogic.should_continue_debate()\nchecks count vs max_debate_rounds
+end
+
+G -> RM : research_manager(state)
+activate RM
+RM -> LLM1 : with_structured_output(ResearchPlan)\n  .invoke([system_prompt, full_debate_history])
+LLM1 --> RM : ResearchPlan {recommendation, rationale, strategic_actions}
+RM --> G : {investment_plan: plan.render_research_plan()}
+deactivate RM
+
+== Trader Synthesis ==
+
+G -> TR : trader(state)
+activate TR
+TR -> LLM1 : with_structured_output(TraderProposal)\n  .invoke([system_prompt, investment_plan, reports...])
+LLM1 --> TR : TraderProposal {action, reasoning, entry_price, stop_loss, sizing}
+TR --> G : {trader_investment_plan: proposal.render_trader_proposal()}
+deactivate TR
+
+== Risk Management Debate (max_risk_discuss_rounds iterations) ==
+
+loop Round 1..M  [count < max_risk_discuss_rounds]
+  G -> AGG : aggressive_debator(state)
+  activate AGG
+  AGG -> LLM2 : invoke([system_prompt, trader_plan, risk_debate_history...])
+  LLM2 --> AGG : high-risk perspective
+  AGG --> G : {risk_debate_state.aggressive_history updated}
+  deactivate AGG
+
+  G -> CON : conservative_debator(state)
+  activate CON
+  CON -> LLM2 : invoke([system_prompt, trader_plan, aggressive_response...])
+  LLM2 --> CON : risk-mitigation perspective
+  CON --> G : {risk_debate_state.conservative_history updated}
+  deactivate CON
+
+  G -> NEU : neutral_debator(state)
+  activate NEU
+  NEU -> LLM2 : invoke([system_prompt, trader_plan, agg+con responses...])
+  LLM2 --> NEU : balanced perspective
+  NEU --> G : {risk_debate_state.neutral_history updated,\n count += 1}
+  deactivate NEU
+
+  note over G : ConditionalLogic.should_continue_risk_analysis()\nchecks count vs max_risk_discuss_rounds
+end
+
+G -> PM : portfolio_manager(state)
+activate PM
+PM -> LLM2 : with_structured_output(PortfolioDecision)\n  .invoke([system_prompt, full_risk_debate_history, trader_plan])
+LLM2 --> PM : PortfolioDecision {rating, executive_summary, investment_thesis, price_target}
+PM --> G : {final_trade_decision: decision.render_pm_decision()}
+deactivate PM
+
+@enduml

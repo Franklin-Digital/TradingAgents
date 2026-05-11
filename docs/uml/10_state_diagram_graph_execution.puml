@@ -1,0 +1,80 @@
+@startuml State Diagram – Graph Execution Lifecycle
+title TradingAgents — Graph Execution & Memory Lifecycle States
+
+skinparam state {
+  BackgroundColor AliceBlue
+  BorderColor SteelBlue
+  ArrowColor SteelBlue
+}
+
+[*] --> Idle
+
+state Idle : TradingAgentsGraph constructed\nLLMs initialized\nworkflow compiled
+
+Idle --> ResolvingPending : propagate(ticker, date) called
+
+state ResolvingPending : Check TradingMemoryLog\nfor prior PENDING entries\nfor this ticker
+
+state ResolvingCheck <<choice>>
+ResolvingPending --> ResolvingCheck
+
+ResolvingCheck --> Reflecting : pending entries found\n(prices now available)
+ResolvingCheck --> InitializingState : no pending entries
+
+state Reflecting : Fetch actual returns (yfinance)\nCompute raw_return + alpha vs SPY\nLLM reflects on each prior decision\nMemory log updated: PENDING→RESOLVED
+
+Reflecting --> InitializingState
+
+state InitializingState : Propagator.create_initial_state()\nInjects past_context from memory log\nCreates AgentState with empty reports\nSets up InvestDebateState + RiskDebateState
+
+InitializingState --> AnalystPhase
+
+state AnalystPhase {
+  [*] --> MarketAnalysis
+  state MarketAnalysis : LLM tool loop\nget_stock_data + get_indicators\nmarket_report populated
+
+  MarketAnalysis --> SocialAnalysis
+  state SocialAnalysis : LLM tool loop\nnews/sentiment sources\nsentiment_report populated
+
+  SocialAnalysis --> NewsAnalysis
+  state NewsAnalysis : LLM tool loop\nget_news + get_global_news\nnews_report populated
+
+  NewsAnalysis --> FundamentalsAnalysis
+  state FundamentalsAnalysis : LLM tool loop\nget_fundamentals + financials\nfundamentals_report populated
+
+  FundamentalsAnalysis --> [*]
+}
+
+AnalystPhase --> DebatePhase
+
+state DebatePhase {
+  [*] --> InvestmentDebate
+  state InvestmentDebate : Bull ↔ Bear alternation\nN rounds (configurable)\nResearchManager synthesizes → ResearchPlan
+
+  InvestmentDebate --> TraderProposal
+  state TraderProposal : Trader generates TraderProposal\nwith entry_price, stop_loss, sizing
+
+  TraderProposal --> RiskDebate
+  state RiskDebate : Agg → Con → Neu rotation\nM rounds (configurable)\nPortfolioManager synthesizes → PortfolioDecision
+
+  RiskDebate --> [*]
+}
+
+DebatePhase --> Finalizing
+
+state Finalizing : SignalProcessor extracts 5-tier rating\nJSON result logged to disk\nTradingMemoryLog.store_decision() called\n(entry marked PENDING)
+
+Finalizing --> Idle : returns (final_state, signal_dict)
+
+state CheckpointSuspended : Graph suspended at node\nSQLite checkpoint written\n(if checkpoint_enabled=True)
+
+AnalystPhase --> CheckpointSuspended : interrupt_after analyst\n(if configured)
+CheckpointSuspended --> AnalystPhase : resume from checkpoint
+
+note right of CheckpointSuspended
+  Checkpoint allows inspection
+  and resumption mid-graph.
+  Enabled via config["checkpoint_enabled"]
+end note
+
+@enduml

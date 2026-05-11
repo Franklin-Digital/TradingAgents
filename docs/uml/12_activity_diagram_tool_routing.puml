@@ -1,0 +1,53 @@
+@startuml Activity Diagram – Tool Routing
+title TradingAgents — Dataflow Vendor Routing Logic
+
+skinparam activityDiamondBackgroundColor LightYellow
+skinparam activityBackgroundColor AliceBlue
+
+|Agent|
+start
+:Agent needs data\n(e.g., get_stock_data);
+:Call tool function\n(via LangChain ToolNode);
+
+|DataflowInterface|
+:Receive tool_name;
+:Read current DataflowConfig;
+
+if (tool_vendors[tool_name] set?) then (yes)
+  :Use tool-level vendor override\n(e.g., "alpha_vantage");
+else (no)
+  :Determine tool category\n(core_stock_apis / technical_indicators /\nfundamental_data / news_data);
+  if (data_vendors[category] set?) then (yes)
+    :Use category-level vendor\n(e.g., "yfinance");
+  else (no)
+    :Use global default: "yfinance";
+  endif
+endif
+
+if (Vendor == "yfinance") then (yes)
+  |yfinance Vendor|
+  :Call yfinance library;
+  :Fetch OHLCV / indicators /\nfundamentals / news;
+  :Format as markdown string;
+else (no — "alpha_vantage")
+  |Alpha Vantage Vendor|
+  :Read ALPHA_VANTAGE_API_KEY\nfrom environment;
+  if (API key present?) then (yes)
+    :Call Alpha Vantage REST API;
+    :Fetch requested data;
+    :Format as markdown string;
+  else (no)
+    :Raise configuration error;
+    stop
+  endif
+endif
+
+|DataflowInterface|
+:Return formatted string\nto ToolNode;
+
+|Agent|
+:Append tool result to\nLangChain messages;
+:Continue LLM reasoning loop;
+stop
+
+@enduml

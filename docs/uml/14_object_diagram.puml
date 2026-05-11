@@ -1,0 +1,80 @@
+@startuml Object Diagram – Runtime State Snapshot
+title TradingAgents — Example Runtime Object State (AAPL, 2025-01-10)
+
+skinparam objectBackgroundColor LightYellow
+skinparam objectBorderColor DarkGoldenRod
+
+object "agentState : AgentState" as STATE {
+  company_of_interest = "AAPL"
+  trade_date = "2025-01-10"
+  sender = "portfolio_manager"
+  market_report = "AAPL closed at $185.40...[technical summary]"
+  sentiment_report = "Positive social sentiment (75% bullish)..."
+  news_report = "Apple reports record iPhone sales in Q1..."
+  fundamentals_report = "Revenue: $119.6B, P/E: 28.5, EPS: $2.18..."
+  investment_plan = "[Buy] Strong momentum...[ResearchPlan rendered]"
+  trader_investment_plan = "[Buy @ $185.40, SL $178.00, 5% sizing]"
+  final_trade_decision = "[Buy] Price target $205...[PortfolioDecision rendered]"
+  past_context = "## [RESOLVED] AAPL 2024-11-15: Buy (+8.2% alpha)"
+}
+
+object "investDebateState : InvestDebateState" as IDS {
+  count = 3
+  bull_history = "Round 1: Strong iPhone cycle...\nRound 2: AI integration..."
+  bear_history = "Round 1: Valuation stretched...\nRound 2: China headwinds..."
+  history = "[combined debate transcript]"
+  current_response = "Bull: Services revenue accelerating..."
+  judge_decision = "Bull case prevails on growth trajectory"
+}
+
+object "riskDebateState : RiskDebateState" as RDS {
+  count = 2
+  aggressive_history = "Take full position, momentum clear..."
+  conservative_history = "Scale in 50%, volatility ahead..."
+  neutral_history = "5% position sizing, staggered entry..."
+  latest_speaker = "neutral"
+  judge_decision = "5% position, limit order at $185.40"
+}
+
+object "researchPlan : ResearchPlan" as RP {
+  recommendation = PortfolioRating.Buy
+  rationale = "Strong iPhone supercycle with AI tailwinds..."
+  strategic_actions = "Accumulate on dips below $183..."
+}
+
+object "traderProposal : TraderProposal" as TP {
+  action = TraderAction.Buy
+  reasoning = "Breakout above 200-day MA with volume..."
+  entry_price = 185.40
+  stop_loss = 178.00
+  position_sizing = "5% of portfolio"
+}
+
+object "portfolioDecision : PortfolioDecision" as PD {
+  rating = PortfolioRating.Buy
+  executive_summary = "Strong buy with 12-month price target $205"
+  investment_thesis = "AI-driven services growth + hardware refresh..."
+  price_target = 205.00
+  time_horizon = "12 months"
+}
+
+object "memoryLogEntry : LogEntry" as MLE {
+  id = "AAPL-2025-01-10"
+  status = "PENDING"
+  signal = "Buy"
+  date = "2025-01-10"
+  decision = "[full PortfolioDecision text]"
+  reasoning = "[full rationale]"
+}
+
+' ─── Relationships ────────────────────────────────────────────────────────────
+STATE *-- IDS : investment_debate_state
+STATE *-- RDS : risk_debate_state
+STATE ..> RP  : investment_plan derived from
+STATE ..> TP  : trader_investment_plan derived from
+STATE ..> PD  : final_trade_decision derived from
+RP ..> PD     : feeds into
+TP ..> PD     : feeds into
+PD ..> MLE    : stored in memory log
+
+@enduml

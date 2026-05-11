@@ -1,0 +1,105 @@
+@startuml Sequence – propagate()
+title TradingAgents — Main Propagation Flow
+
+skinparam sequenceMessageAlign direction
+skinparam responseMessageBelowArrow true
+
+actor User
+participant "TradingAgentsGraph" as TAG
+participant "Propagator" as PROP
+participant "TradingMemoryLog" as MEM
+participant "LangGraph\nStateGraph" as GRAPH
+participant "Analysts\n(Market/News/Social/Fundamentals)" as ANALYSTS
+participant "DataflowInterface" as DI
+participant "Bull/Bear\nResearchers" as DEBATE
+participant "ResearchManager" as RM
+participant "Trader" as TR
+participant "Risk Debators\n(Agg/Con/Neu)" as RISK
+participant "PortfolioManager" as PM
+participant "SignalProcessor" as SP
+participant "Reflector" as REF
+
+User -> TAG : propagate(ticker, date)
+
+group Resolve Pending Entries
+  TAG -> MEM : get_pending_entries()
+  MEM --> TAG : pending[]
+  loop for each pending entry (same ticker)
+    TAG -> DI : fetch_returns(ticker, entry_date, today)
+    DI --> TAG : actual_return, alpha_vs_spy
+    TAG -> REF : reflect_on_final_decision(decision, outcome)
+    REF --> TAG : reflection_text
+    TAG -> MEM : batch_update_with_outcomes([{id, reflection, outcome}])
+  end
+end
+
+TAG -> MEM : get_past_context(ticker)
+MEM --> TAG : past_context (markdown snippet)
+
+TAG -> PROP : create_initial_state(ticker, date, past_context)
+PROP --> TAG : AgentState
+
+TAG -> GRAPH : invoke(AgentState, config)
+
+group Phase 1: Analyst Reports (sequential)
+  GRAPH -> ANALYSTS : market_analyst(state)
+  ANALYSTS -> DI : get_stock_data(), get_indicators()
+  DI --> ANALYSTS : price/indicator data
+  ANALYSTS --> GRAPH : {market_report: "..."}
+
+  GRAPH -> ANALYSTS : social_media_analyst(state)
+  ANALYSTS -> DI : get_news() [sentiment sources]
+  DI --> ANALYSTS : social data
+  ANALYSTS --> GRAPH : {sentiment_report: "..."}
+
+  GRAPH -> ANALYSTS : news_analyst(state)
+  ANALYSTS -> DI : get_news(), get_global_news()
+  DI --> ANALYSTS : news articles
+  ANALYSTS --> GRAPH : {news_report: "..."}
+
+  GRAPH -> ANALYSTS : fundamentals_analyst(state)
+  ANALYSTS -> DI : get_fundamentals(), get_balance_sheet(), get_cashflow()
+  DI --> ANALYSTS : financial statements
+  ANALYSTS --> GRAPH : {fundamentals_report: "..."}
+end
+
+group Phase 2: Investment Debate (max_debate_rounds)
+  loop until count >= max_debate_rounds
+    GRAPH -> DEBATE : bull_researcher(state)
+    DEBATE --> GRAPH : bull_history updated
+    GRAPH -> DEBATE : bear_researcher(state)
+    DEBATE --> GRAPH : bear_history updated
+  end
+  GRAPH -> RM : research_manager(state)
+  RM --> GRAPH : investment_plan (ResearchPlan)
+end
+
+group Phase 3: Trader Proposal
+  GRAPH -> TR : trader(state)
+  TR --> GRAPH : trader_investment_plan (TraderProposal)
+end
+
+group Phase 4: Risk Debate (max_risk_discuss_rounds)
+  loop until count >= max_risk_discuss_rounds
+    GRAPH -> RISK : aggressive_debator(state)
+    RISK --> GRAPH : aggressive opinion
+    GRAPH -> RISK : conservative_debator(state)
+    RISK --> GRAPH : conservative opinion
+    GRAPH -> RISK : neutral_debator(state)
+    RISK --> GRAPH : neutral opinion
+  end
+  GRAPH -> PM : portfolio_manager(state)
+  PM --> GRAPH : final_trade_decision (PortfolioDecision)
+end
+
+GRAPH --> TAG : final AgentState
+
+TAG -> SP : process_signal(final_state)
+SP --> TAG : signal ("Buy" | "Overweight" | "Hold" | "Underweight" | "Sell")
+
+TAG -> TAG : _log_state(final_state)  [save JSON to disk]
+TAG -> MEM : store_decision(ticker, date, signal, decision, reasoning)
+
+TAG --> User : (final_state, signal_dict)
+
+@enduml

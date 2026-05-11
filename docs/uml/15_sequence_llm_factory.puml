@@ -1,0 +1,73 @@
+@startuml Sequence – LLM Client Factory
+title TradingAgents — LLM Client Creation & Structured Output Flow
+
+skinparam responseMessageBelowArrow true
+
+participant "TradingAgentsGraph\n__init__" as TAG
+participant "create_llm_client()\nfactory" as FAC
+participant "validate_provider()" as VAL
+participant "OpenAIClient" as OAI
+participant "AnthropicClient" as ANT
+participant "GoogleClient" as GOO
+participant "DeepSeekChatOpenAI" as DS
+participant "BaseLLMClient" as BASE
+participant "ResearchManager\nagent" as RM
+participant "LLM Provider API" as API
+
+TAG -> FAC : create_llm_client(\n  provider="openai",\n  model="gpt-4o",\n  **kwargs\n)
+activate FAC
+
+FAC -> VAL : validate_provider_model(provider, model)
+VAL --> FAC : valid (or raises ValueError)
+
+FAC -> OAI : OpenAIClient(\n  model="gpt-4o",\n  temperature=0.1\n)
+activate OAI
+OAI -> OAI : self.client = ChatOpenAI(model="gpt-4o")
+OAI --> FAC : OpenAIClient instance
+deactivate OAI
+
+FAC --> TAG : BaseLLMClient (as OpenAIClient)
+deactivate FAC
+
+note over TAG : Repeated for deep_thinking_llm\nand quick_thinking_llm
+
+TAG -> FAC : create_llm_client(\n  provider="anthropic",\n  model="claude-3-5-sonnet-20241022",\n  thinking={"type":"enabled","budget_tokens":5000}\n)
+FAC -> ANT : AnthropicClient(model, thinking_config)
+ANT --> FAC : AnthropicClient instance
+FAC --> TAG : BaseLLMClient (as AnthropicClient)
+
+' ─── Structured Output Path ────────────────────────────────────────────────
+TAG -> RM : create_research_manager(deep_thinking_llm)
+
+RM -> BASE : with_structured_output(ResearchPlan)
+activate BASE
+BASE -> OAI : client.with_structured_output(\n  ResearchPlan,\n  method="json_schema"\n)
+OAI --> BASE : structured_llm (Runnable)
+BASE --> RM : structured_llm
+deactivate BASE
+
+RM -> BASE : structured_llm.invoke(messages)
+BASE -> API : POST /chat/completions\n{response_format: {type:"json_schema", ...}}
+API --> BASE : JSON matching ResearchPlan schema
+BASE -> BASE : pydantic.parse(response) → ResearchPlan
+BASE --> RM : ResearchPlan instance
+
+RM -> RM : plan.render_research_plan() → str
+RM --> TAG : {investment_plan: rendered_str}
+
+' ─── DeepSeek Thinking Path ────────────────────────────────────────────────
+note over TAG, DS
+  Special case: DeepSeek with thinking mode
+end note
+
+TAG -> FAC : create_llm_client(\n  provider="deepseek",\n  model="deepseek-reasoner"\n)
+FAC -> DS : DeepSeekChatOpenAI(\n  model="deepseek-reasoner",\n  thinking_budget=8000\n)
+DS -> DS : self.client = ChatOpenAI(\n  base_url="https://api.deepseek.com",\n  model="deepseek-reasoner"\n)
+DS --> FAC : DeepSeekChatOpenAI instance
+FAC --> TAG : BaseLLMClient (as DeepSeekChatOpenAI)
+
+DS -> API : POST (DeepSeek API)\n{messages, model}\n→ thinking tokens + response
+API --> DS : {reasoning_content, content}
+DS -> DS : strip <think>...</think>\nreturn content only
+
+@enduml

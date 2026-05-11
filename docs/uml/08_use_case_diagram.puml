@@ -1,0 +1,91 @@
+@startuml Use Case Diagram
+title TradingAgents — Use Cases
+
+left to right direction
+skinparam actorStyle awesome
+
+actor "Developer / Quant" as DEV
+actor "CLI User" as CLI_USER
+actor "LLM Provider\n(OpenAI/Anthropic/\nGoogle/Azure)" as LLM
+actor "Market Data\nProvider\n(yfinance / AlphaVantage)" as DATA
+
+rectangle "TradingAgents System" {
+
+  usecase "Analyze stock\nfor a given date" as UC1
+  usecase "Run full\nanalyst pipeline" as UC2
+  usecase "Conduct investment\ndebate (Bull vs Bear)" as UC3
+  usecase "Generate trader\nproposal" as UC4
+  usecase "Conduct risk\ndebate (Agg/Con/Neu)" as UC5
+  usecase "Produce final\nportfolio decision" as UC6
+  usecase "View signal\n(Buy/Hold/Sell tier)" as UC7
+
+  usecase "Configure LLM\nprovider & models" as UC8
+  usecase "Configure data\nvendors" as UC9
+  usecase "Enable/disable\nanalyst modules" as UC10
+  usecase "Set debate\nround counts" as UC11
+
+  usecase "Reflect on past\ndecision outcomes" as UC12
+  usecase "Inject past\ncontext into agents" as UC13
+  usecase "Resume from\ncheckpoint" as UC14
+
+  usecase "Fetch stock\nprice & OHLCV data" as UC15
+  usecase "Fetch technical\nindicators" as UC16
+  usecase "Fetch fundamental\ndata (financials)" as UC17
+  usecase "Fetch news &\nsentiment data" as UC18
+
+  usecase "Generate\nanalyst report" as UC19
+  usecase "Generate structured\noutput (Pydantic)" as UC20
+
+  ' ─── CLI-specific ──────────────────────────────────────────────────────────
+  usecase "Run interactive\nCLI wizard" as UC21
+  usecase "View live agent\nexecution output" as UC22
+  usecase "Browse saved\nresults" as UC23
+}
+
+' ─── Actor associations ──────────────────────────────────────────────────────
+DEV --> UC1
+DEV --> UC8
+DEV --> UC9
+DEV --> UC10
+DEV --> UC11
+DEV --> UC12
+DEV --> UC14
+
+CLI_USER --> UC21
+CLI_USER --> UC22
+CLI_USER --> UC23
+CLI_USER --> UC1
+
+LLM --> UC19
+LLM --> UC20
+
+DATA --> UC15
+DATA --> UC16
+DATA --> UC17
+DATA --> UC18
+
+' ─── Include relationships ───────────────────────────────────────────────────
+UC1 ..> UC2 : <<include>>
+UC2 ..> UC3 : <<include>>
+UC2 ..> UC4 : <<include>>
+UC2 ..> UC5 : <<include>>
+UC2 ..> UC6 : <<include>>
+UC6 ..> UC7 : <<include>>
+
+UC2 ..> UC15 : <<include>>
+UC2 ..> UC16 : <<include>>
+UC2 ..> UC17 : <<include>>
+UC2 ..> UC18 : <<include>>
+
+UC3 ..> UC19 : <<include>>
+UC4 ..> UC20 : <<include>>
+UC6 ..> UC20 : <<include>>
+
+UC1 ..> UC13 : <<include>>
+UC1 ..> UC12 : <<extend>>
+
+' ─── Extend relationships ────────────────────────────────────────────────────
+UC21 ..> UC1 : <<extend>>
+UC14 ..> UC1 : <<extend>>
+
+@enduml

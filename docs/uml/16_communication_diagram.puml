@@ -1,0 +1,73 @@
+@startuml Communication Diagram – Agent Collaboration
+title TradingAgents — Agent Communication & Data Flow
+
+skinparam componentStyle rectangle
+skinparam linetype ortho
+
+' This diagram shows which agents communicate what data to whom.
+' Arrows labeled with the data passed / shared state fields updated.
+
+rectangle "AgentState\n(shared graph state)" as STATE #LightBlue
+
+rectangle "MarketAnalyst" as MA #LightYellow
+rectangle "NewsAnalyst" as NA #LightYellow
+rectangle "SocialMediaAnalyst" as SA #LightYellow
+rectangle "FundamentalsAnalyst" as FA #LightYellow
+
+rectangle "BullResearcher" as BULL #LightGreen
+rectangle "BearResearcher" as BEAR #LightGreen
+rectangle "ResearchManager" as RM #LightGreen
+
+rectangle "Trader" as TR #LightCoral
+
+rectangle "AggressiveDebator" as AGG #Lavender
+rectangle "ConservativeDebator" as CON #Lavender
+rectangle "NeutralDebator" as NEU #Lavender
+rectangle "PortfolioManager" as PM #Lavender
+
+rectangle "SignalProcessor" as SIG #LightGray
+rectangle "TradingMemoryLog" as MEM #Wheat
+
+' ─── Analyst → State ──────────────────────────────────────────────────────────
+MA --> STATE : writes market_report
+NA --> STATE : writes news_report
+SA --> STATE : writes sentiment_report
+FA --> STATE : writes fundamentals_report
+
+' ─── State → Researchers ──────────────────────────────────────────────────────
+STATE --> BULL : reads market_report\nnews_report\nsentiment_report\nfundamentals_report\nbear_history
+STATE --> BEAR : reads market_report\nnews_report\nsentiment_report\nfundamentals_report\nbull_history
+
+' ─── Researcher ↔ State (debate history) ─────────────────────────────────────
+BULL --> STATE : updates bull_history\ncount++
+BEAR --> STATE : updates bear_history\ncount++
+
+' ─── State → ResearchManager ─────────────────────────────────────────────────
+STATE --> RM : reads full debate\n(bull_history + bear_history)\nall analyst reports
+RM --> STATE : writes investment_plan\n(ResearchPlan rendered)
+
+' ─── State → Trader ───────────────────────────────────────────────────────────
+STATE --> TR : reads investment_plan\nall analyst reports
+TR --> STATE : writes trader_investment_plan\n(TraderProposal rendered)
+
+' ─── State → Risk Debators ────────────────────────────────────────────────────
+STATE --> AGG : reads trader_investment_plan\naggressive_history
+STATE --> CON : reads trader_investment_plan\naggressive_history\nconservative_history
+STATE --> NEU : reads trader_investment_plan\nagg+con histories
+
+AGG --> STATE : updates aggressive_history
+CON --> STATE : updates conservative_history
+NEU --> STATE : updates neutral_history\ncount++
+
+' ─── State → PortfolioManager ─────────────────────────────────────────────────
+STATE --> PM : reads full risk_debate_state\ntrader_investment_plan\ninvestment_plan
+PM --> STATE : writes final_trade_decision\n(PortfolioDecision rendered)
+
+' ─── Final Processing ─────────────────────────────────────────────────────────
+STATE --> SIG : reads final_trade_decision
+SIG --> MEM : stores signal + decision\nas PENDING entry
+
+' ─── Memory → Propagator (next run) ──────────────────────────────────────────
+MEM --> STATE : injects past_context\ninto new AgentState\n(via Propagator)
+
+@enduml

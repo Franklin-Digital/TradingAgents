@@ -1,0 +1,119 @@
+@startuml Class Diagram – Data Flows & Tool Vendors
+title TradingAgents — Dataflows, Tool Routing & Vendor Abstraction
+
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+package "dataflows" {
+
+  class DataflowConfig {
+    + core_stock_apis : str
+    + technical_indicators : str
+    + fundamental_data : str
+    + news_data : str
+    + tool_vendors : dict[str, str]
+    + get_config() : dict
+    + set_config(config: dict) : None
+  }
+
+  class DataflowInterface {
+    + VENDOR_METHODS : dict[str, dict[str, Callable]]
+    + TOOLS_CATEGORIES : dict[str, list[str]]
+    + get_data_vendor(tool_name: str, config: dict) : str
+    + get_tool_fn(tool_name: str, vendor: str) : Callable
+    + build_tool_list(category: str, config: dict) : list[Tool]
+  }
+
+  ' ─── yfinance vendor ──────────────────────────────────────────────────────
+  package "yfinance_vendor" {
+    class YFinanceStock {
+      + get_stock_data(ticker, start, end) : str
+      + get_indicators(ticker, date) : str
+    }
+    class YFinanceNews {
+      + get_news(ticker, date) : str
+      + get_global_news(date) : str
+    }
+    class YFinanceFundamentals {
+      + get_fundamentals(ticker) : str
+      + get_balance_sheet(ticker) : str
+      + get_cashflow(ticker) : str
+      + get_income_statement(ticker) : str
+      + get_insider_transactions(ticker) : str
+    }
+  }
+
+  ' ─── Alpha Vantage vendor ─────────────────────────────────────────────────
+  package "alpha_vantage_vendor" {
+    class AlphaVantageStock {
+      + api_key : str
+      + get_stock_data(ticker, start, end) : str
+      + get_indicators(ticker, date) : str
+    }
+    class AlphaVantageNews {
+      + api_key : str
+      + get_news(ticker, date) : str
+      + get_global_news(date) : str
+    }
+    class AlphaVantageFundamentals {
+      + api_key : str
+      + get_fundamentals(ticker) : str
+      + get_balance_sheet(ticker) : str
+      + get_cashflow(ticker) : str
+      + get_income_statement(ticker) : str
+    }
+  }
+
+  ' ─── Tool Categories ──────────────────────────────────────────────────────
+  class ToolCategory <<enumeration>> {
+    core_stock_apis
+    technical_indicators
+    fundamental_data
+    news_data
+  }
+
+  DataflowInterface --> DataflowConfig : reads
+  DataflowInterface ..> YFinanceStock : routes to
+  DataflowInterface ..> YFinanceNews : routes to
+  DataflowInterface ..> YFinanceFundamentals : routes to
+  DataflowInterface ..> AlphaVantageStock : routes to
+  DataflowInterface ..> AlphaVantageNews : routes to
+  DataflowInterface ..> AlphaVantageFundamentals : routes to
+  DataflowInterface --> ToolCategory : organizes by
+}
+
+' ─── Agent Tool Usage ──────────────────────────────────────────────────────
+package "agents.utils.tools" {
+  class CoreStockTools {
+    + get_stock_data : Tool
+    + get_YFin_data_online : Tool
+  }
+  class TechnicalIndicatorsTools {
+    + get_indicators : Tool
+  }
+  class FundamentalDataTools {
+    + get_fundamentals : Tool
+    + get_balance_sheet : Tool
+    + get_cashflow : Tool
+    + get_income_statement : Tool
+    + get_insider_transactions : Tool
+  }
+  class NewsDataTools {
+    + get_news : Tool
+    + get_global_news : Tool
+  }
+
+  CoreStockTools --> DataflowInterface : calls
+  TechnicalIndicatorsTools --> DataflowInterface : calls
+  FundamentalDataTools --> DataflowInterface : calls
+  NewsDataTools --> DataflowInterface : calls
+}
+
+note bottom of DataflowInterface
+  Routing priority:
+  1. tool_vendors[tool_name]  (tool-level override)
+  2. data_vendors[category]   (category default)
+  3. "yfinance"               (global default)
+end note
+
+@enduml
