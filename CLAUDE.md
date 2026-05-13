@@ -13,8 +13,8 @@ No API key required — the gateway is on the internal network via Cloudflare tu
 ```python
 config = DEFAULT_CONFIG.copy()
 config["llm_provider"]    = "vllm"
-config["deep_think_llm"]  = "llama-4-scout"
-config["quick_think_llm"] = "llama-4-scout"
+config["deep_think_llm"]  = "RedHatAI/Llama-4-Scout-17B-16E-Instruct-quantized.w4a16"
+config["quick_think_llm"] = "RedHatAI/Llama-4-Scout-17B-16E-Instruct-quantized.w4a16"
 ```
 
 Gateway endpoint: `https://ai-gateway.franklinfinancial.ai/v1` (default).
