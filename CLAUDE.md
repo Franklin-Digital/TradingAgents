@@ -7,16 +7,27 @@ It runs multi-agent LLM analysis on scanner-filtered symbols and writes decision
 
 ### LLM Provider
 
-Franklin uses Anthropic Claude. Set in the dispatcher or pass to `TradingAgentsGraph`:
+Franklin runs **llama-4-scout** via the Bifrost AI Gateway (vLLM on the DGX).
+No API key required — the gateway is on the internal network via Cloudflare tunnel.
 
 ```python
 config = DEFAULT_CONFIG.copy()
+config["llm_provider"]    = "vllm"
+config["deep_think_llm"]  = "RedHatAI/Llama-4-Scout-17B-16E-Instruct-quantized.w4a16"
+config["quick_think_llm"] = "RedHatAI/Llama-4-Scout-17B-16E-Instruct-quantized.w4a16"
+```
+
+Gateway endpoint: `https://ai-gateway.franklinfinancial.ai/v1` (default).
+Override via env: `VLLM_BASE_URL`, `VLLM_API_KEY` (optional — only if gateway adds auth).
+
+Anthropic Claude is still supported as a fallback:
+
+```python
 config["llm_provider"]    = "anthropic"
 config["deep_think_llm"]  = "claude-sonnet-4-6"
 config["quick_think_llm"] = "claude-haiku-4-5-20251001"
+# Requires ANTHROPIC_API_KEY
 ```
-
-Requires `ANTHROPIC_API_KEY` in the environment.
 
 ### QuestDB Data Source
 
@@ -56,19 +67,18 @@ Decisions are written back to QuestDB `trading_decisions` by `integration/decisi
 ```bash
 cd /Users/Sal/Projects/Franklin/TauricTradingAgents
 pip install -e .
-export ANTHROPIC_API_KEY=...
-python -m cli.main   # interactive CLI
+python -m cli.main   # interactive CLI — select "vllm" provider
 
-# or programmatically:
+# or programmatically via Bifrost:
 python -c "
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
 config = DEFAULT_CONFIG.copy()
-config['llm_provider']   = 'anthropic'
-config['deep_think_llm'] = 'claude-sonnet-4-6'
-config['quick_think_llm']= 'claude-haiku-4-5-20251001'
+config['llm_provider']    = 'vllm'
+config['deep_think_llm']  = 'llama-4-scout'
+config['quick_think_llm'] = 'llama-4-scout'
 ta = TradingAgentsGraph(config=config)
-state, decision = ta.propagate('NVDA', '2026-05-12')
+state, decision = ta.propagate('NVDA', '2026-05-13')
 print(decision)
 "
 ```

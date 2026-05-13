@@ -117,6 +117,12 @@ _PROVIDER_CONFIG = {
     "glm": ("https://api.z.ai/api/paas/v4/", "ZHIPU_API_KEY"),
     "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY"),
     "ollama": ("http://localhost:11434/v1", None),
+    # Franklin AI Gateway (Bifrost) — vLLM on DGX, OpenAI Chat Completions compatible.
+    # No API key required; override URL via VLLM_BASE_URL, auth via VLLM_API_KEY.
+    "vllm": (
+        os.getenv("VLLM_BASE_URL", "https://ai-gateway.franklinfinancial.ai/v1"),
+        "VLLM_API_KEY",
+    ),
 }
 
 
@@ -151,11 +157,26 @@ class OpenAIClient(BaseLLMClient):
             default_base, api_key_env = _PROVIDER_CONFIG[self.provider]
             llm_kwargs["base_url"] = self.base_url or default_base
             if api_key_env:
-                api_key = os.environ.get(api_key_env)
+                # Fall back to "EMPTY" for providers that don't require auth
+                # (e.g. vllm on a private gateway) so ChatOpenAI doesn't try OPENAI_API_KEY.
+                api_key = os.environ.get(api_key_env) or (
+                    "EMPTY" if self.provider == "vllm" else None
+                )
                 if api_key:
                     llm_kwargs["api_key"] = api_key
             else:
                 llm_kwargs["api_key"] = "ollama"
+
+            # Cloudflare Access service token — required when the gateway is
+            # protected by CF Access policy (CF_ACCESS_CLIENT_ID + _SECRET).
+            if self.provider == "vllm":
+                cf_id = os.environ.get("CF_ACCESS_CLIENT_ID")
+                cf_secret = os.environ.get("CF_ACCESS_CLIENT_SECRET")
+                if cf_id and cf_secret:
+                    llm_kwargs["default_headers"] = {
+                        "CF-Access-Client-Id": cf_id,
+                        "CF-Access-Client-Secret": cf_secret,
+                    }
         elif self.base_url:
             llm_kwargs["base_url"] = self.base_url
 
