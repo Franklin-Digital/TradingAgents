@@ -103,6 +103,24 @@ class DeepSeekChatOpenAI(NormalizedChatOpenAI):
             )
         return super().with_structured_output(schema, method=method, **kwargs)
 
+class VLLMChatOpenAI(NormalizedChatOpenAI):
+    """vLLM-specific override.
+
+    vLLM requires --enable-auto-tool-choice and --tool-call-parser startup
+    flags to support tool_choice="auto". Without them, function-calling
+    structured output fails with HTTP 400. Raising NotImplementedError here
+    causes agent factories to fall back to free-text generation automatically
+    (same pattern as DeepSeekChatOpenAI for deepseek-reasoner).
+    """
+
+    def with_structured_output(self, schema, *, method=None, **kwargs):
+        raise NotImplementedError(
+            "vLLM requires --enable-auto-tool-choice to support tool_choice; "
+            "structured output is unavailable. Agent factories fall back to "
+            "free-text generation automatically."
+        )
+
+
 # Kwargs forwarded from user config to ChatOpenAI
 _PASSTHROUGH_KWARGS = (
     "timeout", "max_retries", "reasoning_effort",
@@ -192,7 +210,12 @@ class OpenAIClient(BaseLLMClient):
 
         # DeepSeek's thinking-mode quirks live in their own subclass so the
         # base NormalizedChatOpenAI stays free of provider-specific branches.
-        chat_cls = DeepSeekChatOpenAI if self.provider == "deepseek" else NormalizedChatOpenAI
+        if self.provider == "deepseek":
+            chat_cls = DeepSeekChatOpenAI
+        elif self.provider == "vllm":
+            chat_cls = VLLMChatOpenAI
+        else:
+            chat_cls = NormalizedChatOpenAI
         return chat_cls(**llm_kwargs)
 
     def validate_model(self) -> bool:
