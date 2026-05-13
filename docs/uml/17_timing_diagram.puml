@@ -1,0 +1,123 @@
+@startuml Timing Diagram – Pipeline Execution Timeline
+title TradingAgents — Approximate Execution Timing per Phase
+
+' Timing diagram showing relative durations of each pipeline phase
+
+concise "Market Analyst" as MA
+concise "News Analyst" as NA
+concise "Social Analyst" as SA
+concise "Fundamentals Analyst" as FA
+concise "Investment Debate" as ID
+concise "Trader" as TR
+concise "Risk Debate" as RD
+concise "Portfolio Manager" as PM
+concise "Memory / IO" as MEM
+
+@0
+MA is Idle
+NA is Idle
+SA is Idle
+FA is Idle
+ID is Idle
+TR is Idle
+RD is Idle
+PM is Idle
+MEM is {Resolving Pending}
+
+@5
+MEM is Idle
+MA is {Fetching\nData}
+
+@20
+MA is {LLM\nAnalysis}
+
+@35
+MA is Idle
+NA is {Fetching\nData}
+
+@50
+NA is {LLM\nAnalysis}
+
+@65
+NA is Idle
+SA is {Fetching\nData}
+
+@75
+SA is {LLM\nAnalysis}
+
+@90
+SA is Idle
+FA is {Fetching\nData}
+
+@105
+FA is {LLM\nAnalysis}
+
+@120
+FA is Idle
+ID is {Bull Round 1}
+
+@135
+ID is {Bear Round 1}
+
+@150
+ID is {Bull Round 2}
+
+@165
+ID is {Bear Round 2}
+
+@180
+ID is {ResearchManager\nSynthesis}
+
+@200
+ID is Idle
+TR is {Trader\nProposal}
+
+@215
+TR is Idle
+RD is {Agg Round 1}
+
+@225
+RD is {Con Round 1}
+
+@235
+RD is {Neu Round 1}
+
+@245
+RD is {Agg Round 2}
+
+@255
+RD is {Con Round 2}
+
+@265
+RD is {Neu Round 2}
+
+@275
+RD is Idle
+PM is {Portfolio\nDecision}
+
+@295
+PM is Idle
+MEM is {Store\nDecision}
+
+@300
+MEM is Idle
+
+note top of MA
+  Each analyst loops:
+  tool_call → result → tool_call → ...
+  until LLM stops calling tools
+end note
+
+note top of ID
+  N=2 debate rounds shown.
+  Configurable via
+  max_debate_rounds.
+end note
+
+note top of RD
+  M=2 risk rounds shown.
+  Configurable via
+  max_risk_discuss_rounds.
+end note
+
+@enduml

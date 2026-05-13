@@ -1,0 +1,164 @@
+@startuml Component Diagram
+title TradingAgents — System Component Architecture
+
+skinparam componentStyle rectangle
+skinparam linetype ortho
+
+' ─── External Actors ──────────────────────────────────────────────────────────
+actor "User / Script" as USER
+actor "CLI (Typer)" as CLI
+
+' ─── Top-Level System Boundary ────────────────────────────────────────────────
+rectangle "TradingAgents System" {
+
+  ' ─── Entry Points ───────────────────────────────────────────────────────────
+  component "TradingAgentsGraph\n(main.py API)" as TAG
+  component "CLI App\n(cli/main.py)" as CLIAPP
+
+  ' ─── Graph Orchestration ────────────────────────────────────────────────────
+  rectangle "Graph Layer (LangGraph)" {
+    component "GraphSetup\n(workflow builder)" as GS
+    component "ConditionalLogic\n(routing rules)" as CL
+    component "Propagator\n(state initializer)" as PROP
+    component "Reflector\n(LLM-based)" as REFL
+    component "SignalProcessor\n(regex parser)" as SIG
+    component "StateGraph\n(compiled)" as SG
+  }
+
+  ' ─── Agent Layer ────────────────────────────────────────────────────────────
+  rectangle "Agent Layer" {
+    rectangle "Analysts" {
+      component "MarketAnalyst" as MA
+      component "NewsAnalyst" as NA
+      component "SocialMediaAnalyst" as SA
+      component "FundamentalsAnalyst" as FA
+    }
+    rectangle "Investment Debate" {
+      component "BullResearcher" as BULL
+      component "BearResearcher" as BEAR
+      component "ResearchManager" as RM
+    }
+    rectangle "Execution" {
+      component "Trader" as TR
+    }
+    rectangle "Risk Debate" {
+      component "AggressiveDebator" as AGG
+      component "ConservativeDebator" as CON
+      component "NeutralDebator" as NEU
+      component "PortfolioManager" as PM
+    }
+  }
+
+  ' ─── LLM Client Layer ────────────────────────────────────────────────────────
+  rectangle "LLM Client Layer" {
+    component "BaseLLMClient\n(abstract)" as BASE
+    component "OpenAIClient" as OAI
+    component "AnthropicClient" as ANT
+    component "GoogleClient" as GOO
+    component "AzureOpenAIClient" as AZU
+    component "DeepSeekChatOpenAI" as DS
+    component "LLMClientFactory\ncreate_llm_client()" as FAC
+  }
+
+  ' ─── Dataflow Layer ──────────────────────────────────────────────────────────
+  rectangle "Dataflow Layer" {
+    component "DataflowInterface\n(tool router)" as DI
+    component "DataflowConfig\n(vendor config)" as DC
+    rectangle "yfinance Vendor" {
+      component "YFinanceStock" as YFS
+      component "YFinanceNews" as YFN
+      component "YFinanceFundamentals" as YFF
+    }
+    rectangle "Alpha Vantage Vendor" {
+      component "AVStock" as AVS
+      component "AVNews" as AVN
+      component "AVFundamentals" as AVF
+    }
+  }
+
+  ' ─── Memory / Persistence Layer ───────────────────────────────────────────────
+  rectangle "Persistence Layer" {
+    component "TradingMemoryLog\n(markdown append-only)" as MEM
+    component "Checkpoint\n(LangGraph SQLite)" as CKP
+    database "results/\n*.json logs" as LOGS
+    database "memory_log.md" as MEMFILE
+  }
+}
+
+' ─── External Services ────────────────────────────────────────────────────────
+cloud "LLM APIs" {
+  component "OpenAI API" as OAIAPI
+  component "Anthropic API" as ANTAPI
+  component "Google AI API" as GOOAPI
+  component "Azure OpenAI" as AZUAPI
+}
+
+cloud "Market Data APIs" {
+  component "Yahoo Finance\n(yfinance lib)" as YFAPI
+  component "Alpha Vantage API" as AVAPI
+}
+
+' ─── Connections ──────────────────────────────────────────────────────────────
+USER --> TAG
+CLI --> CLIAPP
+CLIAPP --> TAG
+
+TAG --> GS
+TAG --> PROP
+TAG --> REFL
+TAG --> SIG
+TAG --> MEM
+TAG --> CKP
+GS --> SG
+SG --> CL
+SG --> MA
+SG --> NA
+SG --> SA
+SG --> FA
+SG --> BULL
+SG --> BEAR
+SG --> RM
+SG --> TR
+SG --> AGG
+SG --> CON
+SG --> NEU
+SG --> PM
+
+TAG --> FAC
+FAC --> OAI
+FAC --> ANT
+FAC --> GOO
+FAC --> AZU
+OAI --|> BASE
+ANT --|> BASE
+GOO --|> BASE
+AZU --|> BASE
+DS --|> OAI
+
+MA --> DI
+NA --> DI
+SA --> DI
+FA --> DI
+DI --> DC
+DI --> YFS
+DI --> YFN
+DI --> YFF
+DI --> AVS
+DI --> AVN
+DI --> AVF
+
+OAI --> OAIAPI
+ANT --> ANTAPI
+GOO --> GOOAPI
+AZU --> AZUAPI
+YFS --> YFAPI
+YFN --> YFAPI
+YFF --> YFAPI
+AVS --> AVAPI
+AVN --> AVAPI
+AVF --> AVAPI
+
+MEM --> MEMFILE
+TAG --> LOGS
+
+@enduml

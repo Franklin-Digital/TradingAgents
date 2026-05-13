@@ -1,0 +1,107 @@
+@startuml Activity Diagram – Full Pipeline
+title TradingAgents — Full Pipeline Activity Flow
+
+skinparam activityDiamondBackgroundColor LightYellow
+skinparam activityBackgroundColor AliceBlue
+skinparam activityBorderColor SteelBlue
+
+|User / Caller|
+start
+:Call propagate(ticker, date);
+
+|TradingAgentsGraph|
+:Load TradingMemoryLog;
+:get_pending_entries(ticker);
+
+if (Pending entries exist?) then (yes)
+  :Fetch actual returns\n(yfinance);
+  :Compute raw_return\nand alpha vs SPY;
+  :LLM reflects on each\nprior decision;
+  :Update log entries\nPENDING → RESOLVED;
+endif
+
+:get_past_context(ticker);
+:Propagator.create_initial_state();
+
+|Market Analyst|
+:Receive AgentState;
+repeat
+  :LLM decides: tool call or finish;
+  if (Tool call?) then (yes)
+    :Execute get_stock_data()\nor get_indicators();
+    :Append tool result to messages;
+  endif
+repeat while (Tool call?) is (yes)
+:Store market_report in state;
+:Clear messages;
+
+|News Analyst|
+repeat
+  :LLM decides: tool call or finish;
+  if (Tool call?) then (yes)
+    :Execute get_news()\nor get_global_news();
+    :Append tool result to messages;
+  endif
+repeat while (Tool call?) is (yes)
+:Store news_report in state;
+:Clear messages;
+
+|Social Media Analyst|
+repeat
+  :LLM decides: tool call or finish;
+  if (Tool call?) then (yes)
+    :Execute news/sentiment tools;
+    :Append tool result to messages;
+  endif
+repeat while (Tool call?) is (yes)
+:Store sentiment_report in state;
+:Clear messages;
+
+|Fundamentals Analyst|
+repeat
+  :LLM decides: tool call or finish;
+  if (Tool call?) then (yes)
+    :Execute get_fundamentals()\nget_balance_sheet()\nget_cashflow()\nget_income_statement();
+    :Append tool result to messages;
+  endif
+repeat while (Tool call?) is (yes)
+:Store fundamentals_report in state;
+
+|Investment Debate|
+:Initialize InvestDebateState;
+repeat
+  :BullResearcher argues\nbull case (reads reports + bear_history);
+  :BearResearcher argues\nbear case (reads reports + bull_history);
+  :count += 1;
+repeat while (count < max_debate_rounds?) is (yes)
+:ResearchManager synthesizes;
+:Produce ResearchPlan\n(structured output);
+:Store investment_plan in state;
+
+|Trader|
+:Read investment_plan + all reports;
+:LLM produces TraderProposal\n(structured output);
+:Store trader_investment_plan in state;
+
+|Risk Debate|
+:Initialize RiskDebateState;
+repeat
+  :AggressiveDebator weighs in;
+  :ConservativeDebator weighs in;
+  :NeutralDebator weighs in;
+  :count += 1;
+repeat while (count < max_risk_discuss_rounds?) is (yes)
+:PortfolioManager synthesizes;
+:Produce PortfolioDecision\n(structured output);
+:Store final_trade_decision in state;
+
+|TradingAgentsGraph|
+:SignalProcessor extracts\n5-tier rating (regex);
+:Log full state as JSON\nto results/ directory;
+:TradingMemoryLog.store_decision()\n(entry marked PENDING);
+
+|User / Caller|
+:Receive (final_state, signal_dict);
+stop
+
+@enduml

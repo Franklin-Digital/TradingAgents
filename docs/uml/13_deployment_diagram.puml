@@ -1,0 +1,95 @@
+@startuml Deployment Diagram
+title TradingAgents — Deployment Architecture
+
+skinparam nodeBackgroundColor AliceBlue
+skinparam nodeBorderColor SteelBlue
+skinparam componentBackgroundColor LightYellow
+skinparam databaseBackgroundColor LightGreen
+skinparam linetype ortho
+
+node "Developer Machine / Server" as LOCAL {
+
+  node "Python Runtime\n(3.10+)" as PYTHON {
+    component "tradingagents\npackage" as PKG
+    component "cli/main.py\n(Typer CLI)" as CLI
+    component "main.py\n(script / API)" as MAIN
+    component "LangGraph\nRuntime" as LG
+  }
+
+  node "Local Filesystem" as FS {
+    database "results/\n*.json" as RESULTS {
+      artifact "AAPL_2025-01-10.json"
+    }
+    database "memory_log.md\n(append-only)" as MEMLOG {
+      artifact "PENDING / RESOLVED entries"
+    }
+    database "checkpoints/\n(SQLite)" as CKPT {
+      artifact "langgraph_checkpoint.db"
+    }
+    database ".env / config\n(API keys)" as ENV {
+      artifact "OPENAI_API_KEY"
+      artifact "ANTHROPIC_API_KEY"
+      artifact "ALPHA_VANTAGE_API_KEY"
+    }
+  }
+
+  MAIN --> LG
+  CLI --> LG
+  LG --> PKG
+  PKG --> FS
+}
+
+cloud "LLM API Cloud" as LLMCLOUD {
+  node "OpenAI Platform" as OPENAI {
+    component "GPT-4o / o3\nChat Completions API" as OAIAPI
+  }
+  node "Anthropic Cloud" as ANTHROPIC {
+    component "Claude 3.5 / 4\nMessages API" as ANTAPI
+  }
+  node "Google AI Studio\n/ Vertex AI" as GOOGLE {
+    component "Gemini 2.0\nGenerateContent API" as GOOAPI
+  }
+  node "Azure OpenAI\nService" as AZURE {
+    component "Azure GPT\ndeployment endpoint" as AZUAPI
+  }
+  node "DeepSeek API\n(OpenAI-compatible)" as DEEPSEEK {
+    component "DeepSeek V3\nChat Completions" as DSAPI
+  }
+}
+
+cloud "Market Data Services" as DATACLOUD {
+  node "Yahoo Finance\n(no API key needed)" as YAHOO {
+    component "yfinance\nPython library" as YFLIB
+    component "Yahoo Finance\nHTTPS endpoints" as YFAPI
+  }
+  node "Alpha Vantage\n(API key required)" as AV {
+    component "Alpha Vantage\nREST API" as AVAPI
+  }
+}
+
+' ─── Connections ──────────────────────────────────────────────────────────────
+PKG ..> OAIAPI : HTTPS (LangChain OpenAI)
+PKG ..> ANTAPI : HTTPS (LangChain Anthropic)
+PKG ..> GOOAPI : HTTPS (LangChain Google)
+PKG ..> AZUAPI : HTTPS (LangChain Azure)
+PKG ..> DSAPI  : HTTPS (OpenAI-compatible)
+
+PKG ..> YFLIB  : library call
+YFLIB ..> YFAPI : HTTPS
+PKG ..> AVAPI  : HTTPS REST
+
+note bottom of CKPT
+  SQLite checkpoint enables
+  mid-graph resume / inspection.
+  Requires checkpoint_enabled=True
+  in config.
+end note
+
+note bottom of MEMLOG
+  Plain markdown file.
+  No database required.
+  Append-only; atomic updates
+  via Python file I/O.
+end note
+
+@enduml

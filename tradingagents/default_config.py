@@ -38,13 +38,16 @@ DEFAULT_CONFIG = {
     # Data vendor configuration
     # Category-level configuration (default for all tools in category)
     "data_vendors": {
-        "core_stock_apis": "yfinance",       # Options: alpha_vantage, yfinance
+        "core_stock_apis": "yfinance",       # Options: alpha_vantage, yfinance, questdb
         "technical_indicators": "yfinance",  # Options: alpha_vantage, yfinance
         "fundamental_data": "yfinance",      # Options: alpha_vantage, yfinance
         "news_data": "yfinance",             # Options: alpha_vantage, yfinance
     },
     # Tool-level configuration (takes precedence over category-level)
     "tool_vendors": {
-        # Example: "get_stock_data": "alpha_vantage",  # Override category default
+        # Example: "get_stock_data": "questdb",  # Use QuestDB for scanner-universe names
     },
+    # QuestDB connection (Franklin prod instance — used when data_vendors.core_stock_apis = "questdb")
+    "questdb_host": os.getenv("QUESTDB_HOST", "192.168.1.41"),
+    "questdb_http_port": int(os.getenv("QUESTDB_HTTP_PORT", "9000")),
 }

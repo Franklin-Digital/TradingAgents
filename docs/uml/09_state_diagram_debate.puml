@@ -1,0 +1,88 @@
+@startuml State Diagram – Debate State Machines
+title TradingAgents — Investment Debate & Risk Debate State Machines
+
+skinparam state {
+  BackgroundColor LightYellow
+  BorderColor DarkGoldenRod
+  ArrowColor DarkGoldenRod
+}
+
+' ════════════════════════════════════════════════════════════════════════════════
+' INVESTMENT DEBATE STATE MACHINE
+' ════════════════════════════════════════════════════════════════════════════════
+state "Investment Debate" as ID {
+  [*] --> ID_Init
+
+  state ID_Init : count = 0\nbull_history = ""\nbear_history = ""
+
+  ID_Init --> ID_Bull : graph routes to BullResearcher
+
+  state ID_Bull : BullResearcher invoked\nLLM generates bull argument\nbull_history += response\ncount += 1
+
+  ID_Bull --> ID_Bear : count is odd → route to BearResearcher
+
+  state ID_Bear : BearResearcher invoked\nLLM generates bear argument\nbear_history += response\ncount += 1
+
+  ID_Bear --> ID_Check : after bear response
+
+  state ID_Check <<choice>>
+  ID_Check --> ID_Bull : count < max_debate_rounds
+  ID_Check --> ID_Judge : count >= max_debate_rounds
+
+  state ID_Judge : ResearchManager invoked\nLLM produces ResearchPlan (structured)\ninvestment_plan set
+  ID_Judge --> [*]
+}
+
+' ════════════════════════════════════════════════════════════════════════════════
+' RISK DEBATE STATE MACHINE
+' ════════════════════════════════════════════════════════════════════════════════
+state "Risk Debate" as RD {
+  [*] --> RD_Init
+
+  state RD_Init : count = 0\nall histories = ""\ntrader_investment_plan available
+
+  RD_Init --> RD_Aggressive : graph routes to AggressiveDebator
+
+  state RD_Aggressive : AggressiveDebator invoked\nadvocates for high-risk position\naggressive_history updated\nlatest_speaker = "aggressive"
+
+  RD_Aggressive --> RD_Conservative
+
+  state RD_Conservative : ConservativeDebator invoked\nadvocates for risk mitigation\nconservative_history updated\nlatest_speaker = "conservative"
+
+  RD_Conservative --> RD_Neutral
+
+  state RD_Neutral : NeutralDebator invoked\nbalances both perspectives\nneutral_history updated\ncount += 1\nlatest_speaker = "neutral"
+
+  RD_Neutral --> RD_RiskCheck
+
+  state RD_RiskCheck <<choice>>
+  RD_RiskCheck --> RD_Aggressive : count < max_risk_discuss_rounds
+  RD_RiskCheck --> RD_PM : count >= max_risk_discuss_rounds
+
+  state RD_PM : PortfolioManager invoked\nLLM produces PortfolioDecision (structured)\nfinal_trade_decision set\nrating = Buy|Overweight|Hold|Underweight|Sell
+  RD_PM --> [*]
+}
+
+' ════════════════════════════════════════════════════════════════════════════════
+' ANALYST TOOL LOOP STATE MACHINE  (same for all 4 analyst types)
+' ════════════════════════════════════════════════════════════════════════════════
+state "Analyst Tool Loop\n(example: MarketAnalyst)" as ATL {
+  [*] --> ATL_Agent
+
+  state ATL_Agent : MarketAnalyst node invoked\nLLM decides: call tool OR finish
+
+  state ATL_Check <<choice>>
+  ATL_Agent --> ATL_Check : LLM response checked
+
+  ATL_Check --> ATL_Tool : tool_calls present in response
+  ATL_Check --> ATL_Done : no tool_calls (report ready)
+
+  state ATL_Tool : ToolNode executes tool call\n(get_stock_data, get_indicators, etc.)\nresult appended to messages
+
+  ATL_Tool --> ATL_Agent : loop back to agent
+
+  state ATL_Done : market_report stored in state\nmessages cleared for next analyst
+  ATL_Done --> [*]
+}
+
+@enduml

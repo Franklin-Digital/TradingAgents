@@ -1,0 +1,186 @@
+@startuml Package Diagram
+title TradingAgents — Python Package Structure & Dependencies
+
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+package "tradingagents" {
+
+  package "agents" {
+    package "analysts" {
+      [market_analyst]
+      [news_analyst]
+      [fundamentals_analyst]
+      [social_media_analyst]
+    }
+    package "researchers" {
+      [bull_researcher]
+      [bear_researcher]
+    }
+    package "managers" {
+      [research_manager]
+      [portfolio_manager]
+    }
+    package "trader" {
+      [trader_agent]
+    }
+    package "risk_mgmt" {
+      [aggressive_debator]
+      [conservative_debator]
+      [neutral_debator]
+    }
+    package "utils" {
+      [agent_states]
+      [agent_utils]
+      [memory]
+      [structured]
+      [rating]
+      [core_stock_tools]
+      [technical_indicators_tools]
+      [fundamental_data_tools]
+      [news_data_tools]
+    }
+    package "schemas" {
+      [ResearchPlan]
+      [TraderProposal]
+      [PortfolioDecision]
+      [PortfolioRating]
+      [TraderAction]
+    }
+  }
+
+  package "graph" {
+    [trading_graph]
+    [setup]
+    [conditional_logic]
+    [propagation]
+    [reflection]
+    [signal_processing]
+    [checkpointer]
+  }
+
+  package "llm_clients" {
+    [base_client]
+    [factory]
+    [openai_client]
+    [anthropic_client]
+    [google_client]
+    [azure_client]
+    [validators]
+  }
+
+  package "dataflows" {
+    [interface]
+    [config]
+    [y_finance]
+    [yfinance_news]
+    [alpha_vantage]
+    [alpha_vantage_stock]
+    [alpha_vantage_fundamentals]
+    [alpha_vantage_news]
+  }
+
+  [default_config]
+}
+
+package "cli" {
+  [main]
+  [config]
+  [models]
+  [utils]
+  [stats_handler]
+  [announcements]
+}
+
+package "Third-Party" {
+  package "langchain" {
+    [langchain_core]
+    [langchain_openai]
+    [langchain_anthropic]
+    [langchain_google_genai]
+  }
+  package "langgraph" {
+    [StateGraph]
+    [ToolNode]
+    [SqliteSaver]
+  }
+  package "pydantic" {
+    [BaseModel]
+    [Field]
+  }
+  [yfinance]
+  [typer]
+  [rich]
+}
+
+' ─── Internal Dependencies ───────────────────────────────────────────────────
+[trading_graph] --> [setup]
+[trading_graph] --> [propagation]
+[trading_graph] --> [reflection]
+[trading_graph] --> [signal_processing]
+[trading_graph] --> [checkpointer]
+[trading_graph] --> [memory]
+[trading_graph] --> [factory]
+
+[setup] --> [conditional_logic]
+[setup] --> [market_analyst]
+[setup] --> [news_analyst]
+[setup] --> [social_media_analyst]
+[setup] --> [fundamentals_analyst]
+[setup] --> [bull_researcher]
+[setup] --> [bear_researcher]
+[setup] --> [research_manager]
+[setup] --> [trader_agent]
+[setup] --> [aggressive_debator]
+[setup] --> [conservative_debator]
+[setup] --> [neutral_debator]
+[setup] --> [portfolio_manager]
+
+[market_analyst] --> [core_stock_tools]
+[market_analyst] --> [technical_indicators_tools]
+[news_analyst] --> [news_data_tools]
+[social_media_analyst] --> [news_data_tools]
+[fundamentals_analyst] --> [fundamental_data_tools]
+
+[core_stock_tools] --> [interface]
+[technical_indicators_tools] --> [interface]
+[fundamental_data_tools] --> [interface]
+[news_data_tools] --> [interface]
+[interface] --> [config]
+[interface] --> [y_finance]
+[interface] --> [yfinance_news]
+[interface] --> [alpha_vantage_stock]
+[interface] --> [alpha_vantage_fundamentals]
+[interface] --> [alpha_vantage_news]
+
+[research_manager] --> [ResearchPlan]
+[trader_agent] --> [TraderProposal]
+[portfolio_manager] --> [PortfolioDecision]
+
+[factory] --> [openai_client]
+[factory] --> [anthropic_client]
+[factory] --> [google_client]
+[factory] --> [azure_client]
+[openai_client] --> [base_client]
+[anthropic_client] --> [base_client]
+[google_client] --> [base_client]
+[azure_client] --> [base_client]
+
+[main] --> [trading_graph]
+[main] --> [default_config]
+
+' ─── Third-Party Dependencies ─────────────────────────────────────────────────
+[trading_graph] --> [StateGraph]
+[trading_graph] --> [SqliteSaver]
+[openai_client] --> [langchain_openai]
+[anthropic_client] --> [langchain_anthropic]
+[google_client] --> [langchain_google_genai]
+[ResearchPlan] --> [BaseModel]
+[TraderProposal] --> [BaseModel]
+[PortfolioDecision] --> [BaseModel]
+[y_finance] --> [yfinance]
+[yfinance_news] --> [yfinance]
+[cli/main] --> [typer]
+[cli/main] --> [rich]
+
+@enduml

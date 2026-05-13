@@ -1,0 +1,57 @@
+@startuml Sequence – CLI Interaction
+title TradingAgents — CLI User Interaction Flow
+
+skinparam responseMessageBelowArrow true
+
+actor "User\n(Terminal)" as USER
+participant "cli/main.py\n(Typer App)" as CLI
+participant "MessageBuffer\n(event tracker)" as BUF
+participant "StatsCallbackHandler\n(LangChain callback)" as STATS
+participant "TradingAgentsGraph" as TAG
+participant "Rich Console\n(live output)" as RICH
+
+USER -> CLI : ta run --ticker AAPL --date 2025-01-10
+
+CLI -> CLI : Load/validate config\n(prompt if missing API keys)
+CLI -> CLI : Build analyst_selection\nfrom CLI flags
+
+CLI -> RICH : Display banner & config summary
+
+CLI -> BUF : MessageBuffer()
+CLI -> STATS : StatsCallbackHandler()
+
+CLI -> TAG : TradingAgentsGraph(config)
+TAG --> CLI : graph instance
+
+CLI -> RICH : Display "Starting analysis..."
+
+CLI -> TAG : propagate(\n  ticker="AAPL",\n  date="2025-01-10",\n  callbacks=[STATS]\n)
+
+loop For each LangGraph event streamed
+  TAG --> BUF : on_agent_start(agent_name, state)
+  BUF -> RICH : Print agent header\n"[Market Analyst] Running..."
+
+  TAG --> BUF : on_tool_start(tool_name, inputs)
+  BUF -> RICH : Print tool call\n"  → get_stock_data(AAPL, 2025-01-10)"
+
+  TAG --> BUF : on_tool_end(tool_name, output)
+  BUF -> RICH : Print tool result summary\n"  ← 252 rows fetched"
+
+  TAG --> BUF : on_agent_finish(agent_name, output)
+  BUF -> RICH : Print report excerpt
+end
+
+TAG --> CLI : (final_state, signal_dict)
+
+CLI -> STATS : get_summary()
+STATS --> CLI : {llm_calls: 18, tool_calls: 12, tokens: 45320}
+
+CLI -> RICH : Display final decision\n┌─────────────────────────┐\n│ Signal: BUY             │\n│ Rating: Buy             │\n│ Price Target: $205      │\n└─────────────────────────┘
+
+CLI -> RICH : Display stats summary\n"LLM calls: 18 | Tokens: 45.3K | Time: 4m 22s"
+
+CLI -> RICH : Display saved results path\n"Results saved to: results/AAPL_2025-01-10.json"
+
+CLI --> USER : Exit 0
+
+@enduml
