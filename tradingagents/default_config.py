@@ -59,6 +59,8 @@ DEFAULT_CONFIG = {
     #   CONFLUENCE_API_TOKEN    <atlassian api token>
     "confluence_publish":         True,
     "confluence_base_url":        "https://franklindigitalcorp.atlassian.net/wiki",
+    # The Trading space's active key is "trading" (it was renamed from the
+    # legacy "TradingAge"; both still work via Confluence's alias mechanism).
     "confluence_space_key":       "trading",
     "confluence_parent_page_id":  "1376579",   # Reports root page
 }
