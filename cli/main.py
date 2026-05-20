@@ -1174,9 +1174,24 @@ def run_analysis(checkpoint: bool = False):
     # Post-analysis prompts (outside Live context for clean interaction)
     console.print("\n[bold cyan]Analysis Complete![/bold cyan]\n")
 
-    # Prompt to save report
-    save_choice = typer.prompt("Save report?", default="Y").strip().upper()
-    if save_choice in ("Y", "YES", ""):
+    # Confluence is the default destination — the publish hook in
+    # trading_graph.propagate() already created the page automatically. The
+    # local file save is now opt-in for users who want an offline copy.
+    if config.get("confluence_publish", True):
+        console.print(
+            "[green]✓ Report published to Confluence[/green] "
+            "(see logs above for the page URL).\n"
+            "  [dim]To disable Confluence: set confluence_publish=False in config.[/dim]\n"
+        )
+    else:
+        console.print(
+            "[yellow]Confluence publishing is disabled "
+            "(confluence_publish=False).[/yellow]\n"
+        )
+
+    # Prompt to save a LOCAL copy (default: N — Confluence is the source of truth)
+    save_choice = typer.prompt("Also save a local copy?", default="N").strip().upper()
+    if save_choice in ("Y", "YES"):
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         default_path = Path.cwd() / "reports" / f"{selections['ticker']}_{timestamp}"
         save_path_str = typer.prompt(
@@ -1186,7 +1201,7 @@ def run_analysis(checkpoint: bool = False):
         save_path = Path(save_path_str)
         try:
             report_file = save_report_to_disk(final_state, selections["ticker"], save_path)
-            console.print(f"\n[green]✓ Report saved to:[/green] {save_path.resolve()}")
+            console.print(f"\n[green]✓ Local copy saved to:[/green] {save_path.resolve()}")
             console.print(f"  [dim]Complete report:[/dim] {report_file.name}")
         except Exception as e:
             console.print(f"[red]Error saving report: {e}[/red]")
