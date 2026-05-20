@@ -102,6 +102,18 @@ MODEL_OPTIONS: ProviderModeOptions = {
         ],
     },
     # OpenRouter: fetched dynamically. Azure: any deployed model name.
+    "vllm": {
+        "quick": [
+            ("Llama-4-Scout 17B (Franklin Bifrost, quantized w4a16)",
+             "RedHatAI/Llama-4-Scout-17B-16E-Instruct-quantized.w4a16"),
+            ("Custom model ID", "custom"),
+        ],
+        "deep": [
+            ("Llama-4-Scout 17B (Franklin Bifrost, quantized w4a16)",
+             "RedHatAI/Llama-4-Scout-17B-16E-Instruct-quantized.w4a16"),
+            ("Custom model ID", "custom"),
+        ],
+    },
     "ollama": {
         "quick": [
             ("Qwen3:latest (8B, local)", "qwen3:latest"),
