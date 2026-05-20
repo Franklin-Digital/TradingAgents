@@ -42,8 +42,18 @@ def _auth_header() -> str:
     email = os.environ.get("CONFLUENCE_USER_EMAIL", "")
     token = os.environ.get("CONFLUENCE_API_TOKEN", "")
     if not email or not token:
+        # Be specific about which is missing — the most common cause is
+        # running the CLI from an interactive shell that hasn't sourced
+        # franklin.env (systemd loads it for the dashboard service, but
+        # `python -m cli.main` only sees the user's shell env).
+        missing = []
+        if not email: missing.append("CONFLUENCE_USER_EMAIL")
+        if not token: missing.append("CONFLUENCE_API_TOKEN")
         raise EnvironmentError(
-            "CONFLUENCE_USER_EMAIL and CONFLUENCE_API_TOKEN must be set in franklin.env"
+            f"Confluence env var(s) missing: {', '.join(missing)}. "
+            "If running the CLI interactively, source franklin.env first:\n"
+            "  set -a; source /home/Franklin/secrets/franklin.env; set +a\n"
+            "  python -m cli.main"
         )
     return "Basic " + base64.b64encode(f"{email}:{token}".encode()).decode()
 
