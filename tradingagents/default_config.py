@@ -59,6 +59,12 @@ DEFAULT_CONFIG = {
     #   CONFLUENCE_API_TOKEN    <atlassian api token>
     "confluence_publish":         True,
     "confluence_base_url":        "https://franklindigitalcorp.atlassian.net/wiki",
-    "confluence_space_key":       "trading",
+    # NOTE: this MUST be the space primary key, not the URL alias. The
+    # Trading space's primary key is "TradingAge"; "trading" is only a URL
+    # slug alias. Confluence's REST API rejects pages posted under an alias
+    # key, and the publisher's RuntimeError gets swallowed by the CLI's
+    # Rich Live panel — so the symptom is "publish appears successful but
+    # no page actually shows up under Reports".
+    "confluence_space_key":       "TradingAge",
     "confluence_parent_page_id":  "1376579",   # Reports root page
 }
