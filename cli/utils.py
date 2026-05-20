@@ -1,3 +1,4 @@
+import os
 import questionary
 from typing import List, Optional, Tuple, Dict
 
@@ -230,8 +231,15 @@ def select_deep_thinking_agent(provider) -> str:
 
 def select_llm_provider() -> tuple[str, str | None]:
     """Select the LLM provider and its API endpoint."""
-    # (display_name, provider_key, base_url)
+    # vLLM endpoint is Franklin's Bifrost AI Gateway. Override via env
+    # VLLM_BASE_URL when running against a different deployment.
+    _vllm_url = os.environ.get(
+        "VLLM_BASE_URL", "https://ai-gateway.franklinfinancial.ai/v1"
+    )
+    # (display_name, provider_key, base_url) — vLLM listed first since it's
+    # the Franklin production default.
     PROVIDERS = [
+        ("vLLM (Franklin AI Gateway / Bifrost)", "vllm", _vllm_url),
         ("OpenAI", "openai", "https://api.openai.com/v1"),
         ("Google", "google", None),
         ("Anthropic", "anthropic", "https://api.anthropic.com/"),
