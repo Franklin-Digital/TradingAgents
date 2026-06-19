@@ -346,31 +346,6 @@ class TradingAgentsGraph:
             )
 
         signal_string = self.process_signal(final_state["final_trade_decision"])
-
-        # -- publish report to Confluence ---------------------------------
-        # Print to stderr in addition to the logger because the CLI uses
-        # rich.live.Live which can swallow logger output during long runs.
-        # Stderr survives, so the user always sees whether publish succeeded.
-        if self.config.get("confluence_publish", True):
-            import sys
-            try:
-                from tradingagents.confluence_publisher import publish_report
-                page_url = publish_report(
-                    symbol=company_name,
-                    signal=signal_string,
-                    final_state=final_state,
-                    config=self.config,
-                )
-                if page_url:
-                    logger.info(f"[{company_name}] Confluence report: {page_url}")
-                    print(f"\n[Confluence] Published {company_name} report → {page_url}",
-                          file=sys.stderr, flush=True)
-            except Exception as exc:
-                # Non-fatal: log and continue -- never block a trading decision
-                logger.warning(f"[{company_name}] Confluence publish failed: {exc}")
-                print(f"\n[Confluence] FAILED to publish {company_name} report — {exc}",
-                      file=sys.stderr, flush=True)
-
         return final_state, signal_string
 
     def _log_state(self, trade_date, final_state):
