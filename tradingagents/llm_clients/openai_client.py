@@ -135,10 +135,11 @@ _PROVIDER_CONFIG = {
     "glm": ("https://api.z.ai/api/paas/v4/", "ZHIPU_API_KEY"),
     "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY"),
     "ollama": ("http://localhost:11434/v1", None),
-    # Franklin AI Gateway (Bifrost) — vLLM on DGX, OpenAI Chat Completions compatible.
-    # No API key required; override URL via VLLM_BASE_URL, auth via VLLM_API_KEY.
+    # Franklin AI Gateway (Bifrost) — runs on mac-pro, OpenAI Chat Completions compatible.
+    # Routes to vLLM (Llama on DGX), OpenRouter (DeepSeek), or Anthropic (Claude)
+    # based on model name. No API key required; set BIFROST_BASE_URL to override.
     "vllm": (
-        os.getenv("VLLM_BASE_URL", "https://ai-gateway.franklinfinancial.ai/v1"),
+        os.getenv("BIFROST_BASE_URL", os.getenv("VLLM_BASE_URL", "http://localhost:8080/v1")),
         "VLLM_API_KEY",
     ),
 }
