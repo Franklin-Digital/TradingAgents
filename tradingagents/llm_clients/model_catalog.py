@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Dict, List, Tuple
 
+from tradingagents.default_config import BIFROST_DEFAULT_MODEL
+
 ModelOption = Tuple[str, str]
 ProviderModeOptions = Dict[str, Dict[str, List[ModelOption]]]
 
@@ -102,15 +104,19 @@ MODEL_OPTIONS: ProviderModeOptions = {
         ],
     },
     # OpenRouter: fetched dynamically. Azure: any deployed model name.
+    # Franklin Bifrost gateway. The default model id is resolved from
+    # BIFROST_MODEL (default: the DGX llama-4-scout deployment) so it is not
+    # hardcoded here; "Custom model ID" lets the operator pick any model
+    # Bifrost routes (e.g. claude-*, gpt-*).
     "vllm": {
         "quick": [
-            ("Llama-4-Scout 17B (Franklin Bifrost, quantized w4a16)",
-             "RedHatAI/Llama-4-Scout-17B-16E-Instruct-quantized.w4a16"),
+            (f"Bifrost default model ({BIFROST_DEFAULT_MODEL})",
+             BIFROST_DEFAULT_MODEL),
             ("Custom model ID", "custom"),
         ],
         "deep": [
-            ("Llama-4-Scout 17B (Franklin Bifrost, quantized w4a16)",
-             "RedHatAI/Llama-4-Scout-17B-16E-Instruct-quantized.w4a16"),
+            (f"Bifrost default model ({BIFROST_DEFAULT_MODEL})",
+             BIFROST_DEFAULT_MODEL),
             ("Custom model ID", "custom"),
         ],
     },
