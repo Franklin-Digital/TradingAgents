@@ -35,7 +35,13 @@ class AnthropicClient(BaseLLMClient):
         llm_kwargs = {"model": self.model}
 
         if self.base_url:
-            llm_kwargs["base_url"] = self.base_url
+            # ChatAnthropic appends /v1/messages itself; strip trailing /v1
+            # to avoid double-pathing (e.g. .../v1/v1/messages) when the
+            # shared BIFROST_BASE_URL already includes /v1 for OpenAI compat.
+            url = self.base_url.rstrip("/")
+            if url.endswith("/v1"):
+                url = url[:-3]
+            llm_kwargs["base_url"] = url
 
         for key in _PASSTHROUGH_KWARGS:
             if key in self.kwargs:
