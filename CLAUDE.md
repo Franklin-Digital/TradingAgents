@@ -7,26 +7,25 @@ It runs multi-agent LLM analysis on scanner-filtered symbols and writes decision
 
 ### LLM Provider
 
-Franklin runs **llama-4-scout** via the Bifrost AI Gateway (vLLM on the DGX).
-No API key required — the gateway is on the internal network via Cloudflare tunnel.
+Franklin runs **DeepSeek Cloud** via OpenRouter through the Bifrost AI Gateway (mac-pro).
+Local vLLM/Llama on DGX retired 2026-06-26 — GPU reclaimed for PyTorch signal engine.
 
 ```python
 config = DEFAULT_CONFIG.copy()
-config["llm_provider"]    = "vllm"
-config["deep_think_llm"]  = "RedHatAI/Llama-4-Scout-17B-16E-Instruct-quantized.w4a16"
-config["quick_think_llm"] = "RedHatAI/Llama-4-Scout-17B-16E-Instruct-quantized.w4a16"
+config["llm_provider"]    = "openrouter"
+config["deep_think_llm"]  = "deepseek/deepseek-chat"
+config["quick_think_llm"] = "deepseek/deepseek-chat"
 ```
 
-Gateway endpoint: `https://ai-gateway.franklinfinancial.ai/v1` (default).
-Override via env: `VLLM_BASE_URL`, `VLLM_API_KEY` (optional — only if gateway adds auth).
+Gateway endpoint: `http://localhost:8080/v1` (Bifrost on mac-pro).
+Override via env: `BIFROST_BASE_URL`, `BIFROST_MODEL`.
 
-Anthropic Claude is still supported as a fallback:
+Anthropic Claude is also supported:
 
 ```python
-config["llm_provider"]    = "anthropic"
+config["llm_provider"]    = "openrouter"
 config["deep_think_llm"]  = "claude-sonnet-4-6"
 config["quick_think_llm"] = "claude-haiku-4-5-20251001"
-# Requires ANTHROPIC_API_KEY
 ```
 
 ### QuestDB Data Source
@@ -74,9 +73,9 @@ python -c "
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
 config = DEFAULT_CONFIG.copy()
-config['llm_provider']    = 'vllm'
-config['deep_think_llm']  = 'llama-4-scout'
-config['quick_think_llm'] = 'llama-4-scout'
+config['llm_provider']    = 'openrouter'
+config['deep_think_llm']  = 'deepseek/deepseek-chat'
+config['quick_think_llm'] = 'deepseek/deepseek-chat'
 ta = TradingAgentsGraph(config=config)
 state, decision = ta.propagate('NVDA', '2026-05-13')
 print(decision)

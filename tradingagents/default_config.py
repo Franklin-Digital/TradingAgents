@@ -22,13 +22,13 @@ BIFROST_BASE_URL = os.getenv(
 # hardcode — override with BIFROST_MODEL, or per-tier with BIFROST_DEEP_MODEL /
 # BIFROST_QUICK_MODEL, to point at any model Bifrost serves.
 BIFROST_DEFAULT_MODEL = os.getenv(
-    "BIFROST_MODEL", "RedHatAI/Llama-4-Scout-17B-16E-Instruct-quantized.w4a16"
+    "BIFROST_MODEL", "deepseek/deepseek-chat"
 )
 BIFROST_DEEP_MODEL = os.getenv("BIFROST_DEEP_MODEL", BIFROST_DEFAULT_MODEL)
 BIFROST_QUICK_MODEL = os.getenv("BIFROST_QUICK_MODEL", BIFROST_DEFAULT_MODEL)
-# Provider Tauric uses to reach Bifrost. "vllm" is OpenAI-Chat-Completions
-# compatible and keyless, which is how the gateway is exposed.
-BIFROST_PROVIDER = os.getenv("BIFROST_PROVIDER", "vllm")
+# Provider Tauric uses to reach Bifrost. "openrouter" routes to DeepSeek Cloud
+# (prod default). vLLM local retired 2026-06-26 — GPU reclaimed for PyTorch.
+BIFROST_PROVIDER = os.getenv("BIFROST_PROVIDER", "openrouter")
 
 DEFAULT_CONFIG = {
     "project_dir": os.path.abspath(os.path.join(os.path.dirname(__file__), ".")),
