@@ -1,18 +1,12 @@
-"""Franklin Financial data vendor — IBKR real-time + QuestDB historical.
+"""Franklin Financial data vendor — QuestDB real-time + yfinance fallback.
 
-Replaces yfinance as the primary OHLCV and indicators source.  Data flows:
-
-  IBKR Gateway (salcobian-md) → scanner → QuestDB active_universe (live)
-  IBKR Gateway (historical)   → ibkr_historical_feed → QuestDB on DGX (deep)
-
-This vendor reads from QuestDB directly — no yfinance, no Yahoo Finance,
-no delayed data.  The same real-time IBKR prices that triggered the scanner
-are used for the LLM analysis.
+Unified data layer that prefers real-time IBKR data from QuestDB but falls
+back to yfinance when QuestDB doesn't have the symbol/range.
 
 Query priority:
-  1. QuestDB live-prod (mac-pro) — active_universe, real-time snapshots
+  1. QuestDB live-prod (mac-pro) — active_universe, real-time IBKR snapshots
   2. QuestDB historical (DGX)   — IBKR historical bars for deep history
-  3. Error message (no silent fallback to delayed sources)
+  3. yfinance                   — delayed Yahoo Finance (last resort)
 
 Registered in interface.py as vendor "franklin".
 """
@@ -152,10 +146,10 @@ def get_stock_data(
             f"QuestDB historical ({hist_host}:{hist_port})"
         )
 
-    return (
-        f"No OHLCV data for '{sym}' between {start_date} and {end_date}. "
-        f"Symbol may not be in active_universe or historical tables."
-    )
+    # 3. Fall back to yfinance (delayed data — last resort)
+    log.info("QuestDB has no data for %s [%s → %s], falling back to yfinance", sym, start_date, end_date)
+    from .y_finance import get_YFin_data_online
+    return get_YFin_data_online(symbol, start_date, end_date)
 
 
 # ---------------------------------------------------------------------------
@@ -191,7 +185,10 @@ def _load_ohlcv_df(symbol: str, curr_date: str) -> pd.DataFrame:
     live_rows = _http_query(live_sql, live_host, live_port)
 
     if not rows and not live_rows:
-        return pd.DataFrame()
+        # Fall back to yfinance for symbols not in QuestDB
+        log.info("QuestDB has no OHLCV for %s, falling back to yfinance for indicators", sym)
+        from .stockstats_utils import load_ohlcv
+        return load_ohlcv(sym, curr_date)
 
     # Merge: historical as base, live overlays for recent dates
     all_rows = {r["ts"][:10]: r for r in rows}  # key by date
