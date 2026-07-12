@@ -487,6 +487,13 @@ class TestParseOhlcvCsv:
         df = TradingAgentsGraph._parse_ohlcv_csv(csv)
         assert pd.api.types.is_datetime64_any_dtype(df["Datetime"])
 
+    def test_parses_yfinance_date_column(self):
+        csv = "Date,Open,High,Low,Close,Volume\n2026-07-10,130,132,129,131,1500000\n"
+        df = TradingAgentsGraph._parse_ohlcv_csv(csv)
+        assert len(df) == 1
+        assert "Date" in df.columns
+        assert pd.api.types.is_datetime64_any_dtype(df["Date"])
+
 
 # ---------------------------------------------------------------------------
 # trading_graph._fetch_returns
@@ -531,6 +538,22 @@ class TestFetchReturns:
         assert raw is None
         assert alpha is None
         assert days is None
+
+    def test_returns_none_when_start_close_is_zero(self):
+        stock_csv = (
+            "Datetime,Open,High,Low,Close,Volume\n"
+            "2026-07-07,0,0,0,0,0\n"
+            "2026-07-08,101,106,100,102,1100\n"
+        )
+        spy_csv = (
+            "Datetime,Open,High,Low,Close,Volume\n"
+            "2026-07-07,450,455,449,450,5000000\n"
+            "2026-07-08,451,456,450,452,5100000\n"
+        )
+        with patch("tradingagents.dataflows.franklinfinancial.get_stock_data") as mock_get:
+            mock_get.side_effect = [stock_csv, spy_csv]
+            raw, alpha, days = self._make_graph()._fetch_returns("NVDA", "2026-07-07", holding_days=1)
+        assert raw is None
 
     def test_returns_none_on_exception(self):
         with patch("tradingagents.dataflows.franklinfinancial.get_stock_data", side_effect=RuntimeError("boom")):

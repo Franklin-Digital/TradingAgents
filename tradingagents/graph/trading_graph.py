@@ -212,13 +212,16 @@ class TradingAgentsGraph:
                 return None, None, None
 
             actual_days = min(holding_days, len(stock) - 1, len(spy) - 1)
+            stock_start = float(stock["Close"].iloc[0])
+            spy_start = float(spy["Close"].iloc[0])
+            if stock_start == 0 or spy_start == 0:
+                return None, None, None
+
             raw = float(
-                (stock["Close"].iloc[actual_days] - stock["Close"].iloc[0])
-                / stock["Close"].iloc[0]
+                (stock["Close"].iloc[actual_days] - stock_start) / stock_start
             )
             spy_ret = float(
-                (spy["Close"].iloc[actual_days] - spy["Close"].iloc[0])
-                / spy["Close"].iloc[0]
+                (spy["Close"].iloc[actual_days] - spy_start) / spy_start
             )
             alpha = raw - spy_ret
             return raw, alpha, actual_days
@@ -231,11 +234,15 @@ class TradingAgentsGraph:
 
     @staticmethod
     def _parse_ohlcv_csv(csv_str: str) -> pd.DataFrame:
-        """Parse the CSV string returned by franklinfinancial.get_stock_data."""
+        """Parse the CSV string returned by franklinfinancial or yfinance."""
         lines = [l for l in csv_str.splitlines() if l and not l.startswith("#")]
         if not lines:
             return pd.DataFrame()
-        return pd.read_csv(io.StringIO("\n".join(lines)), parse_dates=["Datetime"])
+        df = pd.read_csv(io.StringIO("\n".join(lines)))
+        date_col = "Datetime" if "Datetime" in df.columns else "Date"
+        if date_col in df.columns:
+            df[date_col] = pd.to_datetime(df[date_col])
+        return df
 
     def _resolve_pending_entries(self, ticker: str) -> None:
         """Resolve pending log entries for ticker at the start of a new run.
