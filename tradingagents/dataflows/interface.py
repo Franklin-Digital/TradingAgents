@@ -31,6 +31,10 @@ from .alpha_vantage import (
 )
 from .alpha_vantage_common import AlphaVantageRateLimitError
 from .questdb_stock import get_questdb_stock_data
+from .franklinfinancial import (
+    get_stock_data as get_franklin_stock_data,
+    get_indicators as get_franklin_indicators,
+)
 
 # Configuration and routing logic
 from .config import get_config
@@ -69,6 +73,7 @@ TOOLS_CATEGORIES = {
 }
 
 VENDOR_LIST = [
+    "franklin",
     "yfinance",
     "alpha_vantage",
     "questdb",
@@ -78,12 +83,14 @@ VENDOR_LIST = [
 VENDOR_METHODS = {
     # core_stock_apis
     "get_stock_data": {
+        "franklin":      get_franklin_stock_data,
         "questdb":       get_questdb_stock_data,
         "alpha_vantage": get_alpha_vantage_stock,
         "yfinance":      get_YFin_data_online,
     },
     # technical_indicators
     "get_indicators": {
+        "franklin":      get_franklin_indicators,
         "alpha_vantage": get_alpha_vantage_indicator,
         "yfinance": get_stock_stats_indicators_window,
     },

@@ -66,8 +66,8 @@ DEFAULT_CONFIG = {
     # Data vendor configuration
     # Category-level configuration (default for all tools in category)
     "data_vendors": {
-        "core_stock_apis": "yfinance",       # Options: alpha_vantage, yfinance, questdb
-        "technical_indicators": "yfinance",  # Options: alpha_vantage, yfinance
+        "core_stock_apis": "franklin",       # Options: franklin, alpha_vantage, yfinance, questdb
+        "technical_indicators": "franklin",  # Options: franklin, alpha_vantage, yfinance
         "fundamental_data": "yfinance",      # Options: alpha_vantage, yfinance
         "news_data": "yfinance",             # Options: alpha_vantage, yfinance
     },
@@ -75,9 +75,12 @@ DEFAULT_CONFIG = {
     "tool_vendors": {
         # Example: "get_stock_data": "questdb",  # Use QuestDB for scanner-universe names
     },
-    # QuestDB connection (Franklin prod instance — used when data_vendors.core_stock_apis = "questdb")
+    # QuestDB live-prod (mac-pro — real-time scanner data)
     "questdb_host": os.getenv("QUESTDB_HOST", "192.168.1.41"),
     "questdb_http_port": int(os.getenv("QUESTDB_HTTP_PORT", "9000")),
+    # QuestDB historical (DGX — IBKR historical bars for deep history)
+    "questdb_historical_host": os.getenv("QUESTDB_HISTORICAL_HOST", "192.168.1.25"),
+    "questdb_historical_http_port": int(os.getenv("QUESTDB_HISTORICAL_HTTP_PORT", "29000")),
     # -- Confluence report publishing --------------------------------------
     # Every call to ta.propagate() auto-publishes a timestamped report page:
     #   Reports -> yyyy -> yyyy-mm -> yyyy-mm-dd HH:MM:SS ET · SYMBOL · Signal
