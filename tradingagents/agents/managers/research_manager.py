@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from tradingagents.agents.schemas import ResearchPlan, render_research_plan
-from tradingagents.agents.utils.agent_utils import build_instrument_context
+from tradingagents.agents.utils.agent_utils import (
+    MAX_HISTORY_CHARS,
+    build_instrument_context,
+    truncate_text,
+)
 from tradingagents.agents.utils.structured import (
     bind_structured,
     invoke_structured_or_freetext,
@@ -15,7 +19,7 @@ def create_research_manager(llm):
 
     def research_manager_node(state) -> dict:
         instrument_context = build_instrument_context(state["company_of_interest"])
-        history = state["investment_debate_state"].get("history", "")
+        history = truncate_text(state["investment_debate_state"].get("history", ""), MAX_HISTORY_CHARS)
 
         investment_debate_state = state["investment_debate_state"]
 

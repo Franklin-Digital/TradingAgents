@@ -1,6 +1,7 @@
 from langchain_core.tools import tool
 from typing import Annotated
 from tradingagents.dataflows.interface import route_to_vendor
+from tradingagents.agents.utils.agent_utils import MAX_TOOL_RESULT_CHARS, truncate_text
 
 
 @tool
@@ -19,4 +20,5 @@ def get_stock_data(
     Returns:
         str: A formatted dataframe containing the stock price data for the specified ticker symbol in the specified date range.
     """
-    return route_to_vendor("get_stock_data", symbol, start_date, end_date)
+    result = route_to_vendor("get_stock_data", symbol, start_date, end_date)
+    return truncate_text(str(result), MAX_TOOL_RESULT_CHARS)

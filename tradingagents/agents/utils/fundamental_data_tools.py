@@ -1,6 +1,7 @@
 from langchain_core.tools import tool
 from typing import Annotated
 from tradingagents.dataflows.interface import route_to_vendor
+from tradingagents.agents.utils.agent_utils import MAX_TOOL_RESULT_CHARS, truncate_text
 
 
 @tool
@@ -17,7 +18,8 @@ def get_fundamentals(
     Returns:
         str: A formatted report containing comprehensive fundamental data
     """
-    return route_to_vendor("get_fundamentals", ticker, curr_date)
+    result = route_to_vendor("get_fundamentals", ticker, curr_date)
+    return truncate_text(str(result), MAX_TOOL_RESULT_CHARS)
 
 
 @tool
@@ -36,7 +38,8 @@ def get_balance_sheet(
     Returns:
         str: A formatted report containing balance sheet data
     """
-    return route_to_vendor("get_balance_sheet", ticker, freq, curr_date)
+    result = route_to_vendor("get_balance_sheet", ticker, freq, curr_date)
+    return truncate_text(str(result), MAX_TOOL_RESULT_CHARS)
 
 
 @tool
@@ -55,7 +58,8 @@ def get_cashflow(
     Returns:
         str: A formatted report containing cash flow statement data
     """
-    return route_to_vendor("get_cashflow", ticker, freq, curr_date)
+    result = route_to_vendor("get_cashflow", ticker, freq, curr_date)
+    return truncate_text(str(result), MAX_TOOL_RESULT_CHARS)
 
 
 @tool
@@ -74,4 +78,5 @@ def get_income_statement(
     Returns:
         str: A formatted report containing income statement data
     """
-    return route_to_vendor("get_income_statement", ticker, freq, curr_date)
+    result = route_to_vendor("get_income_statement", ticker, freq, curr_date)
+    return truncate_text(str(result), MAX_TOOL_RESULT_CHARS)

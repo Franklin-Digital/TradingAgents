@@ -1,5 +1,22 @@
 from langchain_core.messages import HumanMessage, RemoveMessage
 
+# --- Context-budget constants ---
+# DeepSeek context = 131K tokens ≈ 524K chars.  Each debate prompt embeds
+# 4 analyst reports + history + instructions.  These caps keep the total
+# prompt well under the limit even for mega-cap symbols with rich data.
+MAX_TOOL_RESULT_CHARS = 20_000  # per tool call return (news, fundamentals, OHLCV)
+MAX_REPORT_CHARS = 8_000      # per analyst report in debate prompts
+MAX_HISTORY_CHARS = 15_000    # debate history (investment or risk)
+MAX_PAST_CONTEXT_CHARS = 5_000  # memory log past_context
+
+
+def truncate_text(text: str, max_chars: int) -> str:
+    """Truncate text to *max_chars*, appending a notice when trimmed."""
+    if not text or len(text) <= max_chars:
+        return text
+    return text[:max_chars] + f"\n[... truncated to {max_chars:,} chars]"
+
+
 # Import tools from separate utility files
 from tradingagents.agents.utils.core_stock_tools import (
     get_stock_data

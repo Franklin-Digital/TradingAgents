@@ -1,6 +1,7 @@
 from langchain_core.tools import tool
 from typing import Annotated
 from tradingagents.dataflows.interface import route_to_vendor
+from tradingagents.agents.utils.agent_utils import MAX_TOOL_RESULT_CHARS, truncate_text
 
 @tool
 def get_news(
@@ -18,7 +19,8 @@ def get_news(
     Returns:
         str: A formatted string containing news data
     """
-    return route_to_vendor("get_news", ticker, start_date, end_date)
+    result = route_to_vendor("get_news", ticker, start_date, end_date)
+    return truncate_text(str(result), MAX_TOOL_RESULT_CHARS)
 
 @tool
 def get_global_news(
@@ -36,7 +38,8 @@ def get_global_news(
     Returns:
         str: A formatted string containing global news data
     """
-    return route_to_vendor("get_global_news", curr_date, look_back_days, limit)
+    result = route_to_vendor("get_global_news", curr_date, look_back_days, limit)
+    return truncate_text(str(result), MAX_TOOL_RESULT_CHARS)
 
 @tool
 def get_insider_transactions(
@@ -50,4 +53,5 @@ def get_insider_transactions(
     Returns:
         str: A report of insider transaction data
     """
-    return route_to_vendor("get_insider_transactions", ticker)
+    result = route_to_vendor("get_insider_transactions", ticker)
+    return truncate_text(str(result), MAX_TOOL_RESULT_CHARS)

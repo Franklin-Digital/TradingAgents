@@ -1,16 +1,21 @@
+from tradingagents.agents.utils.agent_utils import (
+    MAX_HISTORY_CHARS,
+    MAX_REPORT_CHARS,
+    truncate_text,
+)
 
 
 def create_bear_researcher(llm):
     def bear_node(state) -> dict:
         investment_debate_state = state["investment_debate_state"]
-        history = investment_debate_state.get("history", "")
+        history = truncate_text(investment_debate_state.get("history", ""), MAX_HISTORY_CHARS)
         bear_history = investment_debate_state.get("bear_history", "")
 
         current_response = investment_debate_state.get("current_response", "")
-        market_research_report = state["market_report"]
-        sentiment_report = state["sentiment_report"]
-        news_report = state["news_report"]
-        fundamentals_report = state["fundamentals_report"]
+        market_research_report = truncate_text(state["market_report"], MAX_REPORT_CHARS)
+        sentiment_report = truncate_text(state["sentiment_report"], MAX_REPORT_CHARS)
+        news_report = truncate_text(state["news_report"], MAX_REPORT_CHARS)
+        fundamentals_report = truncate_text(state["fundamentals_report"], MAX_REPORT_CHARS)
 
         prompt = f"""You are a Bear Analyst making the case against investing in the stock. Your goal is to present a well-reasoned argument emphasizing risks, challenges, and negative indicators. Leverage the provided research and data to highlight potential downsides and counter bullish arguments effectively.
 

@@ -12,8 +12,11 @@ from __future__ import annotations
 
 from tradingagents.agents.schemas import PortfolioDecision, render_pm_decision
 from tradingagents.agents.utils.agent_utils import (
+    MAX_HISTORY_CHARS,
+    MAX_PAST_CONTEXT_CHARS,
     build_instrument_context,
     get_language_instruction,
+    truncate_text,
 )
 from tradingagents.agents.utils.structured import (
     bind_structured,
@@ -27,12 +30,12 @@ def create_portfolio_manager(llm):
     def portfolio_manager_node(state) -> dict:
         instrument_context = build_instrument_context(state["company_of_interest"])
 
-        history = state["risk_debate_state"]["history"]
+        history = truncate_text(state["risk_debate_state"]["history"], MAX_HISTORY_CHARS)
         risk_debate_state = state["risk_debate_state"]
         research_plan = state["investment_plan"]
         trader_plan = state["trader_investment_plan"]
 
-        past_context = state.get("past_context", "")
+        past_context = truncate_text(state.get("past_context", ""), MAX_PAST_CONTEXT_CHARS)
         lessons_line = (
             f"- Lessons from prior decisions and outcomes:\n{past_context}\n"
             if past_context

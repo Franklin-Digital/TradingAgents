@@ -1,18 +1,23 @@
+from tradingagents.agents.utils.agent_utils import (
+    MAX_HISTORY_CHARS,
+    MAX_REPORT_CHARS,
+    truncate_text,
+)
 
 
 def create_neutral_debator(llm):
     def neutral_node(state) -> dict:
         risk_debate_state = state["risk_debate_state"]
-        history = risk_debate_state.get("history", "")
+        history = truncate_text(risk_debate_state.get("history", ""), MAX_HISTORY_CHARS)
         neutral_history = risk_debate_state.get("neutral_history", "")
 
         current_aggressive_response = risk_debate_state.get("current_aggressive_response", "")
         current_conservative_response = risk_debate_state.get("current_conservative_response", "")
 
-        market_research_report = state["market_report"]
-        sentiment_report = state["sentiment_report"]
-        news_report = state["news_report"]
-        fundamentals_report = state["fundamentals_report"]
+        market_research_report = truncate_text(state["market_report"], MAX_REPORT_CHARS)
+        sentiment_report = truncate_text(state["sentiment_report"], MAX_REPORT_CHARS)
+        news_report = truncate_text(state["news_report"], MAX_REPORT_CHARS)
+        fundamentals_report = truncate_text(state["fundamentals_report"], MAX_REPORT_CHARS)
 
         trader_decision = state["trader_investment_plan"]
 

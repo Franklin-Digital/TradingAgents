@@ -1,5 +1,12 @@
 from typing import Annotated
 
+# Maximum characters returned by any single tool call.  DeepSeek's context
+# window is 131K tokens (~524K chars).  Each analyst calls multiple tools,
+# and all 4 reports feed into debate prompts, so individual tool returns
+# must stay well under budget.  20K chars ≈ 5K tokens — enough for rich
+# data while leaving headroom for the multi-agent pipeline.
+_MAX_TOOL_CHARS = 20_000
+
 # Import from vendor-specific modules
 from .y_finance import (
     get_YFin_data_online,
@@ -134,6 +141,15 @@ def get_vendor(category: str, method: str = None) -> str:
     # Fall back to category-level configuration
     return config.get("data_vendors", {}).get(category, "default")
 
+def _truncate(text, max_chars: int = _MAX_TOOL_CHARS) -> str:
+    """Truncate text to max_chars, appending a notice when trimmed."""
+    if not isinstance(text, str):
+        text = str(text)
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars] + f"\n\n[... truncated from {len(text):,} to {max_chars:,} chars]"
+
+
 def route_to_vendor(method: str, *args, **kwargs):
     """Route method calls to appropriate vendor implementation with fallback support."""
     category = get_category_for_method(method)
@@ -158,7 +174,8 @@ def route_to_vendor(method: str, *args, **kwargs):
         impl_func = vendor_impl[0] if isinstance(vendor_impl, list) else vendor_impl
 
         try:
-            return impl_func(*args, **kwargs)
+            result = impl_func(*args, **kwargs)
+            return _truncate(result)
         except AlphaVantageRateLimitError:
             continue  # Only rate limits trigger fallback
 
