@@ -7,7 +7,8 @@ import json
 from datetime import datetime, timedelta
 from typing import Dict, Any, Tuple, List, Optional
 
-import yfinance as yf
+import io
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -198,12 +199,14 @@ class TradingAgentsGraph:
         or network error).
         """
         try:
+            from tradingagents.dataflows.franklinfinancial import get_stock_data
+
             start = datetime.strptime(trade_date, "%Y-%m-%d")
-            end = start + timedelta(days=holding_days + 7)  # buffer for weekends/holidays
+            end = start + timedelta(days=holding_days + 7)
             end_str = end.strftime("%Y-%m-%d")
 
-            stock = yf.Ticker(ticker).history(start=trade_date, end=end_str)
-            spy = yf.Ticker("SPY").history(start=trade_date, end=end_str)
+            stock = self._parse_ohlcv_csv(get_stock_data(ticker, trade_date, end_str))
+            spy = self._parse_ohlcv_csv(get_stock_data("SPY", trade_date, end_str))
 
             if len(stock) < 2 or len(spy) < 2:
                 return None, None, None
@@ -225,6 +228,14 @@ class TradingAgentsGraph:
                 ticker, trade_date, e,
             )
             return None, None, None
+
+    @staticmethod
+    def _parse_ohlcv_csv(csv_str: str) -> pd.DataFrame:
+        """Parse the CSV string returned by franklinfinancial.get_stock_data."""
+        lines = [l for l in csv_str.splitlines() if l and not l.startswith("#")]
+        if not lines:
+            return pd.DataFrame()
+        return pd.read_csv(io.StringIO("\n".join(lines)), parse_dates=["Datetime"])
 
     def _resolve_pending_entries(self, ticker: str) -> None:
         """Resolve pending log entries for ticker at the start of a new run.
