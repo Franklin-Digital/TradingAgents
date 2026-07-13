@@ -68,7 +68,7 @@ DEFAULT_CONFIG = {
     "data_vendors": {
         "core_stock_apis": "franklin",       # Options: franklin, alpha_vantage, yfinance, questdb
         "technical_indicators": "franklin",  # Options: franklin, alpha_vantage, yfinance
-        "fundamental_data": "yfinance",      # Options: alpha_vantage, yfinance
+        "fundamental_data": "fmp",  # FMP only — no yfinance runtime dependency (two providers: IBKR + FMP)
         "news_data": "yfinance",             # Options: alpha_vantage, yfinance
     },
     # Tool-level configuration (takes precedence over category-level)

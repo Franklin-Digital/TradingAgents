@@ -439,8 +439,9 @@ class TestDefaultConfig:
         assert DEFAULT_CONFIG["questdb_historical_host"] == "192.168.1.25"
         assert DEFAULT_CONFIG["questdb_historical_http_port"] == 29000
 
-    def test_fundamentals_still_yfinance(self):
-        assert DEFAULT_CONFIG["data_vendors"]["fundamental_data"] == "yfinance"
+    def test_fundamentals_is_fmp(self):
+        # DAYTRADE-179: FMP is the only fundamentals vendor
+        assert DEFAULT_CONFIG["data_vendors"]["fundamental_data"] == "fmp"
 
     def test_news_still_yfinance(self):
         assert DEFAULT_CONFIG["data_vendors"]["news_data"] == "yfinance"
