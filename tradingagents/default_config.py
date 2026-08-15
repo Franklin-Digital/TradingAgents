@@ -79,8 +79,13 @@ DEFAULT_CONFIG = {
     "questdb_host": os.getenv("QUESTDB_HOST", "192.168.1.41"),
     "questdb_http_port": int(os.getenv("QUESTDB_HTTP_PORT", "9000")),
     # QuestDB historical (DGX — IBKR historical bars for deep history)
+    # 39000 = questdb-ibkr-fmp-historical. NOT 29000, which is the FROZEN
+    # Databento archive whose ibkr_* tables are pre-split leftovers stuck at
+    # 2026-08-05 (2,753 symbols vs 11,558 live). This comment already said
+    # "IBKR historical bars" while the value pointed at the archive; the value
+    # was the thing that ran. See franklinfinancial.py for the measurements.
     "questdb_historical_host": os.getenv("QUESTDB_HISTORICAL_HOST", "192.168.1.25"),
-    "questdb_historical_http_port": int(os.getenv("QUESTDB_HISTORICAL_HTTP_PORT", "29000")),
+    "questdb_historical_http_port": int(os.getenv("QUESTDB_HISTORICAL_HTTP_PORT", "39000")),
     # -- Confluence report publishing --------------------------------------
     # Every call to ta.propagate() auto-publishes a timestamped report page:
     #   Reports -> yyyy -> yyyy-mm -> yyyy-mm-dd HH:MM:SS ET · SYMBOL · Signal
