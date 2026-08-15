@@ -31,7 +31,27 @@ _LIVE_HOST = os.getenv("QUESTDB_HOST", "192.168.1.41")
 _LIVE_PORT = int(os.getenv("QUESTDB_HTTP_PORT", "9000"))
 
 _HIST_HOST = os.getenv("QUESTDB_HISTORICAL_HOST", "192.168.1.25")
-_HIST_PORT = int(os.getenv("QUESTDB_HISTORICAL_HTTP_PORT", "29000"))
+# 39000 = questdb-ibkr-fmp-historical (LIVE). NOT 29000.
+#
+# 29000 is the FROZEN Databento archive. The historical estate was split by
+# vendor on 2026-08-06 and this default was never moved, so every ibkr_ohlcv_*
+# read here went to an instance whose ibkr_* tables are pre-split leftovers.
+# Measured 2026-08-15, same query against both:
+#
+#                       29000 (frozen)      39000 (live)
+#     rows                   349,101         3,692,127     10.6x
+#     symbols                  2,753            11,558      4.2x
+#     newest bar          2026-08-05        2026-08-14
+#
+# It failed SILENTLY: a date range past 2026-08-05 returns zero rows, which is
+# indistinguishable from "this symbol has no data". Caught only because the
+# archive's own query log showed a live SELECT for SCHY over 2026-08-14..26.
+#
+# This file queries exactly two tables — active_universe (live, 9000) and
+# ibkr_ohlcv_* (historical) — and NO databento_* tables, so this port must
+# never point at the archive. See DayTradingAgent/common/questdb_instances.py,
+# which routes by table prefix and is the authority on which instance owns what.
+_HIST_PORT = int(os.getenv("QUESTDB_HISTORICAL_HTTP_PORT", "39000"))
 
 
 def _get_config():

@@ -37,7 +37,7 @@ def mock_config():
         "questdb_host": "192.168.1.41",
         "questdb_http_port": 9000,
         "questdb_historical_host": "192.168.1.25",
-        "questdb_historical_http_port": 29000,
+        "questdb_historical_http_port": 39000,
     }
 
 
@@ -199,7 +199,9 @@ class TestGetStockData:
             get_stock_data("NVDA", "2026-01-10", "2026-01-11")
 
         assert mock_q.call_args_list[1][0][1] == "192.168.1.25"
-        assert mock_q.call_args_list[1][0][2] == 29000
+        # 39000 = live ibkr-fmp historical. This asserted 29000 (the FROZEN
+        # Databento archive) and so PINNED the routing bug in place.
+        assert mock_q.call_args_list[1][0][2] == 39000
 
 
 # ---------------------------------------------------------------------------
@@ -436,8 +438,14 @@ class TestDefaultConfig:
         assert "questdb_historical_http_port" in DEFAULT_CONFIG
 
     def test_historical_questdb_defaults_to_dgx(self):
+        """The DGX runs TWO QuestDB instances; naming the host is not enough.
+
+        29000 is the frozen Databento archive (ibkr_* stuck at 2026-08-05,
+        2,753 symbols); 39000 is the live ibkr-fmp instance (2026-08-14,
+        11,558 symbols). This test asserted 29000 and pinned the bug.
+        """
         assert DEFAULT_CONFIG["questdb_historical_host"] == "192.168.1.25"
-        assert DEFAULT_CONFIG["questdb_historical_http_port"] == 29000
+        assert DEFAULT_CONFIG["questdb_historical_http_port"] == 39000
 
     def test_fundamentals_is_fmp(self):
         # DAYTRADE-179: FMP is the only fundamentals vendor
