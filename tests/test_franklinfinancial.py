@@ -145,12 +145,32 @@ class TestGetStockData:
         assert "121.5" in result
         assert mock_q.call_count == 2
 
-    def test_falls_back_to_yfinance_when_both_questdb_empty(self, patch_config):
+    def test_falls_back_to_FMP_not_yfinance_when_both_questdb_empty(self, patch_config):
+        """This test used to assert the opposite, and that is the bug.
+
+        It pinned a yfinance fallback, which CLAUDE.md bans in production
+        (licensed vendors only, fail loud). The path was live: while the
+        historical port pointed at the frozen archive, QuestDB had no recent
+        bars and ai-score rated positions on scraped prices without one error.
+        """
+        fmp_rows = [{"ts": "2026-07-10", "open": 10, "high": 11,
+                     "low": 9, "close": 10.5, "volume": 100}]
         with patch("tradingagents.dataflows.franklinfinancial._http_query", return_value=[]), \
-             patch("tradingagents.dataflows.y_finance.get_YFin_data_online", return_value="yfinance data"):
+             patch("tradingagents.dataflows.fmp_ohlcv.get_daily_bars", return_value=fmp_rows) as mock_fmp:
             result = get_stock_data("RKLB", "2026-07-10", "2026-07-11")
 
-        assert result == "yfinance data"
+        mock_fmp.assert_called_once()
+        assert "FMP historical-price-eod" in result
+        assert "yfinance" not in result.lower()
+
+    def test_reports_NO_DATA_when_questdb_and_FMP_are_both_empty(self, patch_config):
+        """Empty beats unlicensed. The agent must see "no data", not a price."""
+        with patch("tradingagents.dataflows.franklinfinancial._http_query", return_value=[]), \
+             patch("tradingagents.dataflows.fmp_ohlcv.get_daily_bars", return_value=[]):
+            result = get_stock_data("RKLB", "2026-07-10", "2026-07-11")
+
+        assert "NO DATA" in result
+        assert "Total records: 0" in result
 
     def test_symbol_uppercased(self, patch_config):
         with patch("tradingagents.dataflows.franklinfinancial._http_query") as mock_q:
@@ -272,19 +292,29 @@ class TestLoadOhlcvDf:
         assert len(df) == 1
         assert float(df["Close"].iloc[0]) == 104
 
-    def test_falls_back_to_yfinance_when_both_empty(self, patch_config):
-        yf_df = pd.DataFrame({
-            "Date": [pd.Timestamp("2026-07-10")],
-            "Open": [130.0], "High": [132.0], "Low": [129.0],
-            "Close": [131.0], "Volume": [1500000],
-        })
+    def test_falls_back_to_FMP_not_yfinance_when_both_empty(self, patch_config):
+        """Indicators built on scraped prices are as unlicensed as the prices.
 
+        stockstats_utils.load_ohlcv is a yfinance path; this asserted it was
+        called.
+        """
+        fmp_rows = [{"ts": "2026-07-10", "open": 130.0, "high": 132.0,
+                     "low": 129.0, "close": 131.0, "volume": 1500000}]
         with patch("tradingagents.dataflows.franklinfinancial._http_query", return_value=[]), \
-             patch("tradingagents.dataflows.stockstats_utils.load_ohlcv", return_value=yf_df) as mock_yf:
+             patch("tradingagents.dataflows.fmp_ohlcv.get_daily_bars", return_value=fmp_rows) as mock_fmp:
             df = _load_ohlcv_df("RKLB", "2026-07-10")
 
-        mock_yf.assert_called_once_with("RKLB", "2026-07-10")
+        mock_fmp.assert_called_once()
         assert len(df) == 1
+        assert float(df.iloc[0]["Close"]) == 131.0
+
+    def test_returns_an_empty_frame_when_questdb_and_FMP_are_both_empty(self, patch_config):
+        with patch("tradingagents.dataflows.franklinfinancial._http_query", return_value=[]), \
+             patch("tradingagents.dataflows.fmp_ohlcv.get_daily_bars", return_value=[]):
+            df = _load_ohlcv_df("RKLB", "2026-07-10")
+
+        assert df.empty
+        assert list(df.columns) == ["Date", "Open", "High", "Low", "Close", "Volume"]
         assert float(df["Close"].iloc[0]) == 131.0
 
     def test_filters_zero_close_rows(self, patch_config):
