@@ -315,7 +315,6 @@ class TestLoadOhlcvDf:
 
         assert df.empty
         assert list(df.columns) == ["Date", "Open", "High", "Low", "Close", "Volume"]
-        assert float(df["Close"].iloc[0]) == 131.0
 
     def test_filters_zero_close_rows(self, patch_config):
         rows = [
