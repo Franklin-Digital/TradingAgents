@@ -200,3 +200,70 @@ def test_route_to_vendor_raises_runtime_error_when_fmp_rate_limited():
             route_to_vendor("get_fundamentals", "AAPL")
     fmp_impl.assert_called_once()
     yf_impl.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# FMP daily OHLCV — the LICENSED fallback that replaced yfinance (2026-08-15)
+#
+# The old fallback was yfinance, which the house rules ban in production. It was
+# firing constantly (14 times in one nightly ai-score run) because the historical
+# QuestDB port pointed at the frozen archive, so ratings were being produced on
+# scraped prices with no error anywhere.
+# ---------------------------------------------------------------------------
+
+from unittest.mock import patch  # noqa: E402
+
+from tradingagents.dataflows.fmp_ohlcv import get_daily_bars  # noqa: E402
+
+_FMP_PAYLOAD = """[
+  {"symbol":"SCHY","date":"2026-08-14","open":33.20,"high":33.23,"low":33.13,"close":33.18,"volume":402634},
+  {"symbol":"SCHY","date":"2026-08-12","open":33.26,"high":33.27,"low":33.16,"close":33.18,"volume":456675},
+  {"symbol":"SCHY","date":"2026-08-13","open":33.19,"high":33.20,"low":33.10,"close":33.19,"volume":488327}
+]"""
+
+
+def test_daily_bars_are_returned_ascending():
+    """FMP returns newest-first; every caller here expects ORDER BY ts ASC."""
+    with patch("tradingagents.dataflows.fmp_ohlcv._make_request",
+               return_value=_FMP_PAYLOAD):
+        rows = get_daily_bars("SCHY", "2026-08-12", "2026-08-14")
+    assert [r["ts"] for r in rows] == ["2026-08-12", "2026-08-13", "2026-08-14"]
+
+
+def test_rows_match_the_questdb_shape():
+    """Shaped like a QuestDB row so _format_ohlcv_csv needs no change."""
+    with patch("tradingagents.dataflows.fmp_ohlcv._make_request",
+               return_value=_FMP_PAYLOAD):
+        rows = get_daily_bars("SCHY", "2026-08-12", "2026-08-14")
+    assert set(rows[0]) == {"ts", "open", "high", "low", "close", "volume"}
+
+
+def test_nested_historical_shape_is_accepted():
+    payload = '{"symbol":"X","historical":[{"date":"2026-08-14","open":1,"high":2,"low":1,"close":2,"volume":5}]}'
+    with patch("tradingagents.dataflows.fmp_ohlcv._make_request", return_value=payload):
+        assert len(get_daily_bars("X", "2026-08-01", "2026-08-14")) == 1
+
+
+def test_bar_without_a_close_is_dropped_not_zeroed():
+    """A zero close is indistinguishable from a real price of 0 downstream."""
+    payload = '[{"date":"2026-08-14","open":1,"high":2,"low":1,"close":null,"volume":5}]'
+    with patch("tradingagents.dataflows.fmp_ohlcv._make_request", return_value=payload):
+        assert get_daily_bars("X", "2026-08-01", "2026-08-14") == []
+
+
+def test_non_json_response_yields_no_rows():
+    with patch("tradingagents.dataflows.fmp_ohlcv._make_request", return_value="<html>502</html>"):
+        assert get_daily_bars("X", "2026-08-01", "2026-08-14") == []
+
+
+def test_empty_payload_yields_no_rows():
+    with patch("tradingagents.dataflows.fmp_ohlcv._make_request", return_value="[]"):
+        assert get_daily_bars("X", "2026-08-01", "2026-08-14") == []
+
+
+def test_module_does_not_import_yfinance():
+    """The whole point: this tier is licensed."""
+    import tradingagents.dataflows.fmp_ohlcv as m
+    src = open(m.__file__).read()
+    assert "import yfinance" not in src
+    assert "y_finance" not in src.replace("# ", "")

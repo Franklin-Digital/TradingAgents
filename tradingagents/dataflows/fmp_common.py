@@ -1,7 +1,8 @@
 """Financial Modeling Prep (FMP) shared client — mirrors alpha_vantage_common.
 
-Franklin uses the FMP **Starter** plan, which serves the newer `/stable/` API
-(the legacy `/api/v3/` returns empty on Starter). Key is FMP_API_KEY in franklin.env.
+Franklin is on the FMP **Ultimate** plan (Sal, 2026-08-15; this said "Starter"
+until then). It serves the newer `/stable/` API — the legacy `/api/v3/` returns
+empty. Key is FMP_API_KEY in franklin.env.
 Rate-limit / entitlement errors raise FMPRateLimitError (same contract as
 AlphaVantageRateLimitError). FMP is the ONLY fundamentals vendor (DAYTRADE-179),
 so route_to_vendor surfaces this as a RuntimeError rather than silently

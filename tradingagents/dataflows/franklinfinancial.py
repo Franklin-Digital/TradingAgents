@@ -1,12 +1,13 @@
-"""Franklin Financial data vendor — QuestDB real-time + yfinance fallback.
+"""Franklin Financial data vendor — QuestDB real-time + FMP (licensed) fallback.
 
 Unified data layer that prefers real-time IBKR data from QuestDB but falls
-back to yfinance when QuestDB doesn't have the symbol/range.
+back to FMP when QuestDB doesn't have the symbol/range. NEVER yfinance:
+licensed vendors only, fail loud (CLAUDE.md).
 
 Query priority:
   1. QuestDB live-prod (mac-pro) — active_universe, real-time IBKR snapshots
   2. QuestDB historical (DGX)   — IBKR historical bars for deep history
-  3. yfinance                   — delayed Yahoo Finance (last resort)
+  3. FMP historical-price-eod   — licensed last resort (we pay for this)
 
 Registered in interface.py as vendor "franklin".
 """
@@ -166,10 +167,36 @@ def get_stock_data(
             f"QuestDB historical ({hist_host}:{hist_port})"
         )
 
-    # 3. Fall back to yfinance (delayed data — last resort)
-    log.info("QuestDB has no data for %s [%s → %s], falling back to yfinance", sym, start_date, end_date)
-    from .y_finance import get_YFin_data_online
-    return get_YFin_data_online(symbol, start_date, end_date)
+    # 3. FMP — the licensed last resort. NOT yfinance.
+    #
+    # This used to call y_finance.get_YFin_data_online, which violates the house
+    # rule: licensed vendors only, fail LOUD, never substitute a scraped source
+    # (yfinance is academic-use only). It was not hypothetical — while the
+    # historical port pointed at the frozen archive, this path fired on every
+    # symbol and ai-score rated positions on scraped prices without one error.
+    log.warning("QuestDB has no data for %s [%s → %s] — falling back to FMP "
+                "(licensed). Check the QuestDB path; FMP is the last resort, "
+                "not the plan.", sym, start_date, end_date)
+    try:
+        from .fmp_ohlcv import get_daily_bars
+        fmp_rows = get_daily_bars(sym, start_date, end_date)
+    except Exception:
+        log.exception("FMP daily-bar fetch failed for %s [%s → %s]",
+                      sym, start_date, end_date)
+        fmp_rows = []
+
+    if fmp_rows:
+        return _format_ohlcv_csv(fmp_rows, sym, start_date, end_date,
+                                 "FMP historical-price-eod (licensed fallback)")
+
+    # Every licensed source is empty. Say so plainly. Returning a formatted
+    # zero-row result is deliberate: the agent sees "no data" instead of prices
+    # from a vendor we are not licensed to trade on.
+    log.error("NO DATA for %s [%s → %s] from QuestDB live, QuestDB historical, "
+              "or FMP. Reporting empty rather than substituting an unlicensed "
+              "vendor.", sym, start_date, end_date)
+    return _format_ohlcv_csv([], sym, start_date, end_date,
+                             "NO DATA — QuestDB and FMP both empty")
 
 
 # ---------------------------------------------------------------------------
@@ -205,10 +232,23 @@ def _load_ohlcv_df(symbol: str, curr_date: str) -> pd.DataFrame:
     live_rows = _http_query(live_sql, live_host, live_port)
 
     if not rows and not live_rows:
-        # Fall back to yfinance for symbols not in QuestDB
-        log.info("QuestDB has no OHLCV for %s, falling back to yfinance for indicators", sym)
-        from .stockstats_utils import load_ohlcv
-        return load_ohlcv(sym, curr_date)
+        # FMP, not yfinance — indicators computed on scraped prices are just as
+        # unlicensed as the prices themselves, and stockstats_utils.load_ohlcv
+        # is a yfinance path.
+        log.warning("QuestDB has no OHLCV for %s — falling back to FMP "
+                    "(licensed) for indicators", sym)
+        try:
+            from .fmp_ohlcv import get_daily_bars
+            rows = get_daily_bars(sym, start_str, curr_date)
+        except Exception:
+            log.exception("FMP daily-bar fetch failed for %s", sym)
+            rows = []
+        if not rows:
+            log.error("NO DATA for %s from QuestDB or FMP — returning an empty "
+                      "frame rather than indicators built on an unlicensed "
+                      "vendor.", sym)
+            return pd.DataFrame(
+                columns=["Date", "Open", "High", "Low", "Close", "Volume"])
 
     # Merge: historical as base, live overlays for recent dates
     all_rows = {r["ts"][:10]: r for r in rows}  # key by date
