@@ -150,3 +150,59 @@ def test_get_stock_data_tool_uses_series_truncation(monkeypatch):
     )
     assert len(out) <= MAX_TOOL_RESULT_CHARS
     assert rows[-1] in out
+
+
+# --- The routing layer truncates too, and it runs FIRST ---------------------
+#
+# dataflows.interface.route_to_vendor caps every vendor return before any agent
+# tool wrapper sees it. It also kept the head, so the recent rows were already
+# gone by the time the tool wrapper truncated again — fixing only the wrapper
+# would have been cosmetic. Found by running the real market analyst end to end
+# against AMD: the model received rows ending 2026-06-26 for a 2026-08-31 run,
+# even with the wrapper fixed.
+
+
+def test_route_to_vendor_truncation_keeps_recent_rows(monkeypatch):
+    from tradingagents.dataflows import interface
+
+    text, rows = _series()
+    assert len(text) > interface._MAX_TOOL_CHARS
+
+    monkeypatch.setitem(
+        interface.VENDOR_METHODS["get_stock_data"], "questdb", lambda *a, **k: text
+    )
+    monkeypatch.setattr(interface, "get_vendor", lambda *a, **k: "questdb")
+
+    out = interface.route_to_vendor("get_stock_data", "NVDA", "2026-01-01", "2026-08-30")
+    assert len(out) <= interface._MAX_TOOL_CHARS
+    assert rows[-1] in out, "routing layer dropped the most recent row"
+    assert rows[0] in out
+
+
+def test_route_to_vendor_still_head_truncates_prose(monkeypatch):
+    """News/fundamentals must be unaffected: the lede stays."""
+    from tradingagents.dataflows import interface
+
+    prose = "".join(
+        f"Headline {i}: quarterly results beat expectations, guidance raised.\n"
+        for i in range(2000)
+    )
+    monkeypatch.setitem(
+        interface.VENDOR_METHODS["get_news"], "questdb", lambda *a, **k: prose
+    )
+    monkeypatch.setattr(interface, "get_vendor", lambda *a, **k: "questdb")
+    interface.VENDOR_METHODS["get_news"].setdefault("questdb", lambda *a, **k: prose)
+
+    out = interface.route_to_vendor("get_news", "NVDA", "2026-01-01", "2026-08-30")
+    assert out.startswith("Headline 0:")
+    assert len(out) <= interface._MAX_TOOL_CHARS + 64
+
+
+def test_double_truncation_cannot_resurrect_dropped_rows():
+    """Wrapper-level truncation is powerless once the router has dropped rows.
+
+    Documents why the fix had to land in BOTH layers.
+    """
+    text, rows = _series()
+    already_lost = truncate_text(text, MAX)  # what the old router produced
+    assert rows[-1] not in truncate_series_text(already_lost, MAX)

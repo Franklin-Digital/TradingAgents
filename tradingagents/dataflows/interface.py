@@ -26,6 +26,7 @@ from .franklinfinancial import (
 from .fred import get_macro_data as get_fred_macro_data
 from .polymarket import get_prediction_markets as get_polymarket_prediction_markets
 from .questdb_stock import get_questdb_stock_data
+from .text_truncation import truncate_series_text
 from .y_finance import (
     get_insider_transactions as get_yfinance_insider_transactions,
     get_stock_stats_indicators_window,
@@ -180,12 +181,22 @@ def get_vendor(category: str, method: str = None) -> str:
     return config.get("data_vendors", {}).get(category, "default")
 
 def _truncate(text, max_chars: int = _MAX_TOOL_CHARS) -> str:
-    """Truncate text to max_chars, appending a notice when trimmed."""
+    """Cap a vendor result at *max_chars*, keeping the part that matters.
+
+    This runs on EVERY vendor return, below the agent tool wrappers, so it is
+    the first place a result can lose data — and it used to keep the HEAD
+    unconditionally.  For the OHLCV vendors, which emit rows in ASCENDING time
+    order, that meant the OLDEST rows survived and everything near the analysis
+    date was discarded before any agent ever saw it.  Truncating again in the
+    tool wrapper could not recover what was already gone.
+
+    ``truncate_series_text`` keeps the recent rows for table-shaped results and
+    falls back to head-truncation for prose, so news and fundamentals keep the
+    lede exactly as before.  The character budget is unchanged.
+    """
     if not isinstance(text, str):
         text = str(text)
-    if len(text) <= max_chars:
-        return text
-    return text[:max_chars] + f"\n\n[... truncated from {len(text):,} to {max_chars:,} chars]"
+    return truncate_series_text(text, max_chars)
 
 
 def route_to_vendor(method: str, *args, **kwargs):
