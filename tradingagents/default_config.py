@@ -26,6 +26,14 @@ BIFROST_DEFAULT_MODEL = os.getenv(
 )
 BIFROST_DEEP_MODEL = os.getenv("BIFROST_DEEP_MODEL", BIFROST_DEFAULT_MODEL)
 BIFROST_QUICK_MODEL = os.getenv("BIFROST_QUICK_MODEL", BIFROST_DEFAULT_MODEL)
+# Optional Bifrost fallback chain, comma-separated "<provider>/<model>" (e.g.
+# "nemotron/nemotron-3.5-lightning"). Bifrost fallback is a PER-REQUEST field --
+# there is no server-side fallback config, so a body without "fallbacks" never
+# falls back. Read at call time by
+# tradingagents.llm_clients.openai_client.bifrost_fallback_models() and sent in
+# the OpenAI SDK's extra_body. Unset/empty => the key is omitted entirely and
+# the request body is unchanged. Opting in is explicit; no default here.
+BIFROST_FALLBACK_MODELS = os.getenv("BIFROST_FALLBACK_MODELS", "")
 # Provider Tauric uses to reach Bifrost. "openrouter" routes to DeepSeek Cloud
 # (prod default). vLLM local retired 2026-06-26 — GPU reclaimed for PyTorch.
 BIFROST_PROVIDER = os.getenv("BIFROST_PROVIDER", "openrouter")

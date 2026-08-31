@@ -184,7 +184,28 @@ class VLLMChatOpenAI(NormalizedChatOpenAI):
 _PASSTHROUGH_KWARGS = (
     "timeout", "max_retries", "reasoning_effort", "temperature", "max_tokens",
     "api_key", "callbacks", "http_client", "http_async_client",
+    "extra_body",
 )
+
+# Env var holding the Bifrost per-request fallback chain, comma-separated
+# "<provider>/<model>" entries (e.g. "nemotron/nemotron-3.5-lightning").
+_FALLBACK_ENV = "BIFROST_FALLBACK_MODELS"
+
+
+def bifrost_fallback_models(env=None) -> list:
+    """Parse the Bifrost fallback chain from the environment.
+
+    Bifrost fallback is a **per-request** field: the gateway holds no
+    server-side fallback config, so a request body without ``fallbacks``
+    never falls back. The OpenAI SDK drops unknown top-level kwargs, so the
+    list has to travel in ``extra_body``.
+
+    Returns an empty list when the var is unset, empty, or all-whitespace —
+    in which case no ``extra_body`` is set at all and the request body is
+    byte-identical to the pre-fallback shape. Opting in is explicit.
+    """
+    raw = (env if env is not None else os.environ).get(_FALLBACK_ENV, "")
+    return [part.strip() for part in raw.split(",") if part.strip()]
 
 # OpenAI's ``reasoning_effort`` is only accepted by reasoning models — the GPT-5
 # family and the o-series. Non-reasoning models (gpt-4.1, gpt-4o, ...) 400 with
@@ -371,6 +392,14 @@ class OpenAIClient(BaseLLMClient):
             if key == "reasoning_effort" and not _supports_reasoning_effort(self.model):
                 continue
             llm_kwargs[key] = self.kwargs[key]
+
+        # Bifrost per-request fallback chain. Only added when
+        # BIFROST_FALLBACK_MODELS is set and non-empty, and never overrides an
+        # explicit extra_body from config — so this is a strict no-op for
+        # anyone who has not opted in.
+        fallbacks = bifrost_fallback_models()
+        if fallbacks and "extra_body" not in llm_kwargs:
+            llm_kwargs["extra_body"] = {"fallbacks": fallbacks}
 
         # The subclass (provider quirks) comes from the registry spec.
         return chat_cls(**llm_kwargs)
