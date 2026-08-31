@@ -2,7 +2,7 @@ from typing import Annotated
 
 from langchain_core.tools import tool
 
-from tradingagents.agents.utils.agent_utils import MAX_TOOL_RESULT_CHARS, truncate_text
+from tradingagents.agents.utils.agent_utils import MAX_TOOL_RESULT_CHARS, truncate_series_text
 from tradingagents.dataflows.interface import route_to_vendor
 
 
@@ -23,4 +23,8 @@ def get_stock_data(
         str: A formatted dataframe containing the stock price data for the specified ticker symbol in the specified date range.
     """
     result = route_to_vendor("get_stock_data", symbol, start_date, end_date)
-    return truncate_text(str(result), MAX_TOOL_RESULT_CHARS)
+    # NOT truncate_text: the vendor returns bars in ascending time order, so
+    # head-truncation kept the OLDEST 1% and dropped every recent row (see
+    # truncate_series_text).  This keeps the recent rows verbatim and
+    # downsamples the older ones so the full span still reaches the model.
+    return truncate_series_text(str(result), MAX_TOOL_RESULT_CHARS)
