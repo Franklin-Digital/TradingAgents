@@ -36,11 +36,31 @@ COMPLETION_RESERVE_TOKENS = 16_000  # observed completion peak 11,117 + margin
 # MAX_TOOL_RESULT_CHARS deliberately stays at 20,000. Measured on NVDA/MSFT/
 # GOOGL/AMZN/TSLA, eight of the nine analyst tools return LESS than 20,000
 # chars uncapped (largest: get_balance_sheet at 15,742), so raising this buys
-# them nothing. The ninth, get_stock_data, returns ~1.95 MB (~1.24M tokens) of
-# intraday bars -- 9.4x Nemotron's entire context -- so no cap that fits in any
-# context window makes it complete either. Raising this constant would only
-# inflate the one tool whose data is densest (1.55 chars/token) and least
-# complete. That tool needs downsampling, not a bigger cap.
+# them nothing.
+#
+# The ninth, get_stock_data, is a different problem that a bigger cap cannot
+# solve. Measured at the vendor boundary (below route_to_vendor's _truncate,
+# production routing core_stock_apis="questdb"), NVDA for the requested range
+# 2026-01-01..2026-08-30 returns:
+#
+#   raw            2,140,847 chars / 34,130 rows, spanning 2026-06-22..2026-08-29
+#   after head-cut    20,000 chars /    329 rows, spanning 2026-06-22..2026-06-23
+#
+# i.e. 0.96% of the rows survive, and because truncation keeps the HEAD of a
+# chronologically ascending series, what survives is the OLDEST day. A run on
+# 2026-08-30 reasons about prices that stop on 2026-06-23. Filling all of
+# Nemotron's 262K context would still keep only a few percent, so the fix is
+# downsampling in the tool, not a bigger cap here -- deliberately out of scope
+# for this change.
+#
+# Separately and independently: the vendor returned nothing before 2026-06-22
+# despite the request starting 2026-01-01. That is a data-path gap, not a
+# truncation effect, and is being tracked outside this change.
+#
+# Beware when re-measuring: truncate_text's notice is exactly 32 chars, so a
+# fully-truncated tool result is 20,032 chars. Reading length at or above the
+# tool wrapper therefore reports "20,032 raw, 32 chars dropped, 0 rows lost"
+# and hides the 99% loss entirely. Measure at the vendor impl, as above.
 #
 # Worst case with every cap saturated at once, vs the 131,072 ceiling:
 #
