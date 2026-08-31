@@ -7,13 +7,79 @@ import yfinance as yf
 from langchain_core.messages import HumanMessage, RemoveMessage
 
 # --- Context-budget constants ---
-# DeepSeek context = 131K tokens ≈ 524K chars.  Each debate prompt embeds
-# 4 analyst reports + history + instructions.  These caps keep the total
-# prompt well under the limit even for mega-cap symbols with rich data.
+#
+# CEILING = the smallest context window in the serving chain, NOT the primary's.
+#
+# Production runs Nemotron 3.5 Lightning (262,144 ctx) as primary with
+# BIFROST_FALLBACK_MODELS=deepseek/deepseek-chat (131,072 ctx) behind it.
+# Bifrost fallback is resolved by the GATEWAY, after the request body is
+# already built and sent -- we cannot know which model will serve a call at
+# prompt-construction time. Sizing to Nemotron's 262K would therefore build a
+# prompt that hard-400s the instant the fallback fires, i.e. exactly when
+# robustness matters most. So the budget is DeepSeek's 131,072.
+#
+# When DeepSeek leaves the fallback chain, this is the one number to change.
+CONTEXT_CEILING_TOKENS = 131_072   # DeepSeek V3 -- smallest ctx in the chain
+COMPLETION_RESERVE_TOKENS = 16_000  # observed completion peak 11,117 + margin
+#
+# Caps below are derived from measurement, not round numbers (2026-08-31, 202
+# real symbol runs in ~/.tradingagents/logs + 550 Bifrost calls):
+#
+#   observed max analyst report      14,862 chars  -> MAX_REPORT_CHARS 16,000
+#   observed max debate history      31,520 chars  -> MAX_HISTORY_CHARS 36,000
+#   observed max past_context        21,548 chars  -> MAX_PAST_CONTEXT_CHARS 24,000
+#
+# These are CIRCUIT BREAKERS, not routine filters: sized so the ordinary case
+# passes whole and only a pathological outlier is clipped. Measured prose
+# density is 3.99-4.86 chars/token; the budget below uses a conservative 3.5.
+#
+# MAX_TOOL_RESULT_CHARS deliberately stays at 20,000. Measured on NVDA/MSFT/
+# GOOGL/AMZN/TSLA, eight of the nine analyst tools return LESS than 20,000
+# chars uncapped (largest: get_balance_sheet at 15,742), so raising this buys
+# them nothing.
+#
+# The ninth, get_stock_data, is a different problem that a bigger cap cannot
+# solve. Measured at the vendor boundary (below route_to_vendor's _truncate,
+# production routing core_stock_apis="questdb"), NVDA for the requested range
+# 2026-01-01..2026-08-30 returns:
+#
+#   raw            2,140,847 chars / 34,130 rows, spanning 2026-06-22..2026-08-29
+#   after head-cut    20,000 chars /    329 rows, spanning 2026-06-22..2026-06-23
+#
+# i.e. 0.96% of the rows survive, and because truncation keeps the HEAD of a
+# chronologically ascending series, what survives is the OLDEST day. A run on
+# 2026-08-30 reasons about prices that stop on 2026-06-23. Filling all of
+# Nemotron's 262K context would still keep only a few percent, so the fix is
+# downsampling in the tool, not a bigger cap here -- deliberately out of scope
+# for this change.
+#
+# Separately and independently: the vendor returned nothing before 2026-06-22
+# despite the request starting 2026-01-01. That is a data-path gap, not a
+# truncation effect, and is being tracked outside this change.
+#
+# Beware when re-measuring: truncate_text's notice is exactly 32 chars, so a
+# fully-truncated tool result is 20,032 chars. Reading length at or above the
+# tool wrapper therefore reports "20,032 raw, 32 chars dropped, 0 rows lost"
+# and hides the 99% loss entirely. Measure at the vendor impl, as above.
+#
+# Worst case with every cap saturated at once, vs the 131,072 ceiling:
+#
+#   Analyst phase (unchanged): empirical peak 49,242 tok over 550 calls;
+#                              x1.5 tool-call headroom            ~73,900 tok
+#   Debate phase:   4 x 16,000 + 36,000 = 100,000 chars / 3.5      ~29,500 tok
+#   PM phase:       36,000 + 24,000 + plans ~4,400 + scaffold      ~19,100 tok
+#
+#   peak = analyst phase ~73,900 + 16,000 completion reserve = 89,900 tok
+#        = 69% of 131,072, leaving 31% margin.
+#
+# Note the two phases being raised (29,500 / 19,100) sit far below the analyst
+# phase, so this change does not move the system's peak prompt at all -- it
+# only stops clipping the ~5% of symbols whose reports, debate history, or
+# accumulated lessons overflowed.
 MAX_TOOL_RESULT_CHARS = 20_000  # per tool call return (news, fundamentals, OHLCV)
-MAX_REPORT_CHARS = 8_000      # per analyst report in debate prompts
-MAX_HISTORY_CHARS = 15_000    # debate history (investment or risk)
-MAX_PAST_CONTEXT_CHARS = 5_000  # memory log past_context
+MAX_REPORT_CHARS = 16_000     # per analyst report in debate prompts
+MAX_HISTORY_CHARS = 36_000    # debate history (investment or risk)
+MAX_PAST_CONTEXT_CHARS = 24_000  # memory log past_context
 
 
 def truncate_text(text: str, max_chars: int) -> str:
