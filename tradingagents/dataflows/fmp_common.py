@@ -13,6 +13,8 @@ import os
 
 import requests
 
+from .errors import VendorRateLimitError
+
 API_BASE_URL = "https://financialmodelingprep.com/stable"
 
 
@@ -24,7 +26,7 @@ def get_api_key() -> str:
     return api_key
 
 
-class FMPRateLimitError(Exception):
+class FMPRateLimitError(VendorRateLimitError):
     """Raised when the FMP API rate limit / plan entitlement is exceeded."""
     pass
 

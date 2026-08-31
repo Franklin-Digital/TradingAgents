@@ -5,10 +5,12 @@ from __future__ import annotations
 from tradingagents.agents.schemas import ResearchPlan, render_research_plan
 from tradingagents.agents.utils.agent_utils import (
     MAX_HISTORY_CHARS,
-    build_instrument_context,
+    get_instrument_context_from_state,
+    get_language_instruction,
     truncate_text,
 )
 from tradingagents.agents.utils.structured import (
+    NO_EXTERNAL_TOOLS,
     bind_structured,
     invoke_structured_or_freetext,
 )
@@ -18,7 +20,7 @@ def create_research_manager(llm):
     structured_llm = bind_structured(llm, ResearchPlan, "Research Manager")
 
     def research_manager_node(state) -> dict:
-        instrument_context = build_instrument_context(state["company_of_interest"])
+        instrument_context = get_instrument_context_from_state(state)
         history = truncate_text(state["investment_debate_state"].get("history", ""), MAX_HISTORY_CHARS)
 
         investment_debate_state = state["investment_debate_state"]
@@ -41,7 +43,9 @@ Commit to a clear stance whenever the debate's strongest arguments warrant one; 
 ---
 
 **Debate History:**
-{history}"""
+{history}
+
+{NO_EXTERNAL_TOOLS}""" + get_language_instruction()
 
         investment_plan = invoke_structured_or_freetext(
             structured_llm,

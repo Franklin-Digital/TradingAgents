@@ -68,7 +68,7 @@ def _http_query(sql: str, host: str, port: int, timeout: int = 15) -> list[dict]
         with urllib.request.urlopen(url, timeout=timeout) as resp:
             data = json.loads(resp.read().decode())
         columns = [col["name"] for col in data.get("columns", [])]
-        return [dict(zip(columns, row)) for row in data.get("dataset", [])]
+        return [dict(zip(columns, row, strict=True)) for row in data.get("dataset", [])]
     except Exception as e:
         log.warning("QuestDB query failed (%s:%s): %s", host, port, e)
         return []

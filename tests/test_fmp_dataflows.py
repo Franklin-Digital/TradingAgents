@@ -11,6 +11,7 @@ Covers:
 """
 
 import json
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -109,16 +110,16 @@ def test_filter_statements_falls_back_to_date_field():
 def test_limit_exceeded_dict_body_raises_rate_limit():
     body = {"Error Message": "Limit Reach . Please upgrade your plan — exceeded"}
     with patch.object(fmp_common.requests, "get",
-                      return_value=_mock_response(body=body)):
-        with pytest.raises(FMPRateLimitError):
-            get_fundamentals("AAPL")
+                      return_value=_mock_response(body=body)), \
+         pytest.raises(FMPRateLimitError):
+        get_fundamentals("AAPL")
 
 
 def test_http_429_raises_rate_limit():
     with patch.object(fmp_common.requests, "get",
-                      return_value=_mock_response(status_code=429, body="Too Many Requests")):
-        with pytest.raises(FMPRateLimitError):
-            get_fundamentals("AAPL")
+                      return_value=_mock_response(status_code=429, body="Too Many Requests")), \
+         pytest.raises(FMPRateLimitError):
+        get_fundamentals("AAPL")
 
 
 def test_normal_array_body_passes_through():
@@ -195,9 +196,9 @@ def test_route_to_vendor_raises_runtime_error_when_fmp_rate_limited():
                return_value=_FMP_CONFIG), \
          patch.dict(VENDOR_METHODS["get_fundamentals"],
                     {"fmp": fmp_impl}, clear=True), \
-         patch("tradingagents.dataflows.y_finance.get_fundamentals") as yf_impl:
-        with pytest.raises(RuntimeError, match="No available vendor"):
-            route_to_vendor("get_fundamentals", "AAPL")
+         patch("tradingagents.dataflows.y_finance.get_fundamentals") as yf_impl, \
+         pytest.raises(RuntimeError, match="No available vendor"):
+        route_to_vendor("get_fundamentals", "AAPL")
     fmp_impl.assert_called_once()
     yf_impl.assert_not_called()
 
@@ -210,8 +211,6 @@ def test_route_to_vendor_raises_runtime_error_when_fmp_rate_limited():
 # QuestDB port pointed at the frozen archive, so ratings were being produced on
 # scraped prices with no error anywhere.
 # ---------------------------------------------------------------------------
-
-from unittest.mock import patch  # noqa: E402
 
 from tradingagents.dataflows.fmp_ohlcv import get_daily_bars  # noqa: E402
 
@@ -264,6 +263,6 @@ def test_empty_payload_yields_no_rows():
 def test_module_does_not_import_yfinance():
     """The whole point: this tier is licensed."""
     import tradingagents.dataflows.fmp_ohlcv as m
-    src = open(m.__file__).read()
+    src = Path(m.__file__).read_text()
     assert "import yfinance" not in src
     assert "y_finance" not in src.replace("# ", "")
