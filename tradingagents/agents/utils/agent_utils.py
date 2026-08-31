@@ -112,6 +112,7 @@ from tradingagents.agents.utils.news_data_tools import (  # noqa: E402
 )
 from tradingagents.agents.utils.prediction_markets_tools import get_prediction_markets  # noqa: E402
 from tradingagents.agents.utils.technical_indicators_tools import get_indicators  # noqa: E402
+
 # Truncation helpers live in dataflows.text_truncation so the vendor-routing
 # layer (dataflows.interface.route_to_vendor) shares one implementation without
 # a circular import.  Re-exported here because the debate/researcher agents all
