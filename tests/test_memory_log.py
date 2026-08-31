@@ -72,7 +72,7 @@ def _price_csv(prices, start="2026-01-05"):
     """
     idx = pd.date_range(start=start, periods=len(prices), freq="D")
     rows = "\n".join(
-        f"{d.strftime('%Y-%m-%d')},{p},{p},{p},{p},1000" for d, p in zip(idx, prices)
+        f"{d.strftime('%Y-%m-%d')},{p},{p},{p},{p},1000" for d, p in zip(idx, prices, strict=True)
     )
     return "Datetime,Open,High,Low,Close,Volume\n" + rows + ("\n" if rows else "")
 

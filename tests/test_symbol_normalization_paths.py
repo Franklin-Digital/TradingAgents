@@ -51,7 +51,7 @@ def test_fetch_returns_uses_the_same_symbol_the_data_path_priced(monkeypatch):
         idx = pd.date_range(start="2025-01-02", periods=len(prices), freq="D")
         rows = "\n".join(
             f"{d.strftime('%Y-%m-%d')},{p},{p},{p},{p},1000"
-            for d, p in zip(idx, prices)
+            for d, p in zip(idx, prices, strict=True)
         )
         return "Datetime,Open,High,Low,Close,Volume\n" + rows + "\n"
 

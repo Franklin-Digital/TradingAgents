@@ -335,7 +335,7 @@ class TradingAgentsGraph:
     @staticmethod
     def _parse_ohlcv_csv(csv_str: str) -> pd.DataFrame:
         """Parse the CSV string returned by franklinfinancial or yfinance."""
-        lines = [l for l in csv_str.splitlines() if l and not l.startswith("#")]
+        lines = [line for line in csv_str.splitlines() if line and not line.startswith("#")]
         if not lines:
             return pd.DataFrame()
         df = pd.read_csv(io.StringIO("\n".join(lines)))

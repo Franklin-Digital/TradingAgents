@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from tradingagents.default_config import BIFROST_DEFAULT_MODEL
+
 ModelOption = tuple[str, str]
 ProviderModeOptions = dict[str, dict[str, list[ModelOption]]]
-
-from tradingagents.default_config import BIFROST_DEFAULT_MODEL
 
 # Providers that serve many / frequently-changing models: offer only "Custom
 # model ID" rather than a list that goes stale.

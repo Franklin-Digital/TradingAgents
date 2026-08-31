@@ -20,15 +20,15 @@ Required env vars (franklin.env):
   CONFLUENCE_API_TOKEN    Atlassian API token
 """
 
-import os
-import json
-import urllib.request
-import urllib.error
 import base64
+import json
 import logging
+import os
+import urllib.error
+import urllib.request
 from datetime import datetime
-from zoneinfo import ZoneInfo
 from typing import Any
+from zoneinfo import ZoneInfo
 
 log = logging.getLogger(__name__)
 ET = ZoneInfo("America/New_York")
@@ -47,9 +47,11 @@ def _auth_header() -> str:
         # franklin.env (systemd loads it for the dashboard service, but
         # `python -m cli.main` only sees the user's shell env).
         missing = []
-        if not email: missing.append("CONFLUENCE_USER_EMAIL")
-        if not token: missing.append("CONFLUENCE_API_TOKEN")
-        raise EnvironmentError(
+        if not email:
+            missing.append("CONFLUENCE_USER_EMAIL")
+        if not token:
+            missing.append("CONFLUENCE_API_TOKEN")
+        raise OSError(
             f"Confluence env var(s) missing: {', '.join(missing)}. "
             "If running the CLI interactively, source franklin.env first:\n"
             "  set -a; source /home/Franklin/secrets/franklin.env; set +a\n"

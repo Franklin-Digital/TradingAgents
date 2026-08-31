@@ -23,23 +23,29 @@ def truncate_text(text: str, max_chars: int) -> str:
     return text[:max_chars] + f"\n[... truncated to {max_chars:,} chars]"
 
 
-# Import tools from separate utility files
-from tradingagents.agents.utils.core_stock_tools import get_stock_data
-from tradingagents.agents.utils.fundamental_data_tools import (
+# Import tools from separate utility files.  These MUST stay below the
+# constants above: each tool module does
+#   from tradingagents.agents.utils.agent_utils import MAX_TOOL_RESULT_CHARS
+# so the constants have to exist before the tool modules are executed.
+# Hoisting these to the top of the file is a circular ImportError.
+from tradingagents.agents.utils.core_stock_tools import get_stock_data  # noqa: E402
+from tradingagents.agents.utils.fundamental_data_tools import (  # noqa: E402
     get_balance_sheet,
     get_cashflow,
     get_fundamentals,
     get_income_statement,
 )
-from tradingagents.agents.utils.macro_data_tools import get_macro_indicators
-from tradingagents.agents.utils.market_data_validation_tools import get_verified_market_snapshot
-from tradingagents.agents.utils.news_data_tools import (
+from tradingagents.agents.utils.macro_data_tools import get_macro_indicators  # noqa: E402
+from tradingagents.agents.utils.market_data_validation_tools import (  # noqa: E402
+    get_verified_market_snapshot,
+)
+from tradingagents.agents.utils.news_data_tools import (  # noqa: E402
     get_global_news,
     get_insider_transactions,
     get_news,
 )
-from tradingagents.agents.utils.prediction_markets_tools import get_prediction_markets
-from tradingagents.agents.utils.technical_indicators_tools import get_indicators
+from tradingagents.agents.utils.prediction_markets_tools import get_prediction_markets  # noqa: E402
+from tradingagents.agents.utils.technical_indicators_tools import get_indicators  # noqa: E402
 
 # Public surface: the data tools are imported here so agents and the graph
 # import them from one place, plus the instrument/language helpers defined below.

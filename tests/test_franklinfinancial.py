@@ -5,27 +5,24 @@ for both OHLCV and indicator functions, plus CSV parsing, error handling, and
 the trading_graph integration.
 """
 
-import io
 import json
-from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
 
 from tradingagents.dataflows.franklinfinancial import (
+    _HIST_OHLCV_SQL,
+    _LIVE_OHLCV_SQL,
     _format_ohlcv_csv,
     _http_query,
     _load_ohlcv_df,
-    _LIVE_OHLCV_SQL,
-    _HIST_OHLCV_SQL,
     get_indicators,
     get_stock_data,
 )
 from tradingagents.dataflows.interface import VENDOR_LIST, VENDOR_METHODS, route_to_vendor
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.graph.trading_graph import TradingAgentsGraph
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -189,7 +186,7 @@ class TestGetStockData:
             ]
             result = get_stock_data("NVDA", "2026-07-10", "2026-07-11")
 
-        lines = [l for l in result.splitlines() if l and not l.startswith("#")]
+        lines = [line for line in result.splitlines() if line and not line.startswith("#")]
         assert lines[0] == "Datetime,Open,High,Low,Close,Volume"
 
     def test_csv_metadata_comments(self, patch_config):
@@ -247,7 +244,8 @@ class TestFormatOhlcvCsv:
             {"ts": "2026-07-11T00:00:00Z", "open": 103, "high": 108, "low": 102, "close": 107, "volume": 1200},
         ]
         result = _format_ohlcv_csv(rows, "TEST", "2026-07-10", "2026-07-11", "test")
-        data_lines = [l for l in result.splitlines() if l and not l.startswith("#") and l != "Datetime,Open,High,Low,Close,Volume"]
+        data_lines = [line for line in result.splitlines()
+                      if line and not line.startswith("#") and line != "Datetime,Open,High,Low,Close,Volume"]
         assert len(data_lines) == 2
         assert data_lines[0].startswith("2026-07-10")
 
@@ -416,8 +414,8 @@ class TestGetIndicators:
             result_5 = get_indicators("NVDA", "rsi", "2026-07-10", 5)
             result_30 = get_indicators("NVDA", "rsi", "2026-07-10", 30)
 
-        lines_5 = [l for l in result_5.splitlines() if l.startswith("2026-")]
-        lines_30 = [l for l in result_30.splitlines() if l.startswith("2026-")]
+        lines_5 = [line for line in result_5.splitlines() if line.startswith("2026-")]
+        lines_30 = [line for line in result_30.splitlines() if line.startswith("2026-")]
         assert len(lines_5) < len(lines_30)
 
     def test_indicator_description_included(self, patch_config):
