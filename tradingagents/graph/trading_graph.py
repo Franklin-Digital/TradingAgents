@@ -296,8 +296,12 @@ class TradingAgentsGraph:
             # data interface (QuestDB/FMP), never yfinance. Symbols are passed
             # through unnormalized: normalize_symbol maps to Yahoo conventions
             # (XAUUSD -> GC=F), which the Franklin vendors do not speak.
-            stock = self._parse_ohlcv_csv(get_stock_data(ticker, trade_date, end_str))
-            bench = self._parse_ohlcv_csv(get_stock_data(benchmark, trade_date, end_str))
+            # Called through the class, not ``self``: _fetch_returns must stay
+            # self-free so it can be invoked unbound (upstream's tests call it
+            # with a mock/None receiver).
+            parse = TradingAgentsGraph._parse_ohlcv_csv
+            stock = parse(get_stock_data(ticker, trade_date, end_str))
+            bench = parse(get_stock_data(benchmark, trade_date, end_str))
 
             # Require the full holding window in both series. A rerun before it
             # has traded leaves the entry pending to retry next run, rather than
