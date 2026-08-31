@@ -50,8 +50,15 @@ COMPLETION_RESERVE_TOKENS = 16_000  # observed completion peak 11,117 + margin
 # chronologically ascending series, what survives is the OLDEST day. A run on
 # 2026-08-30 reasons about prices that stop on 2026-06-23. Filling all of
 # Nemotron's 262K context would still keep only a few percent, so the fix is
-# downsampling in the tool, not a bigger cap here -- deliberately out of scope
-# for this change.
+# downsampling in the tool, not a bigger cap here.
+#
+# That downsampling now EXISTS: dataflows/text_truncation.truncate_series_text
+# keeps the recent rows verbatim and thins the older ones, and it is applied in
+# BOTH places a series is capped -- route_to_vendor's _truncate (which runs
+# first, below the tool wrappers, and used to discard the recent rows before any
+# agent saw them) and get_stock_data itself. MAX_TOOL_RESULT_CHARS stays 20,000:
+# the analyst-phase estimate below is anchored on it, and the fix changes WHICH
+# rows survive, not how many chars do.
 #
 # Separately and independently: the vendor returned nothing before 2026-06-22
 # despite the request starting 2026-01-01. That is a data-path gap, not a
@@ -82,13 +89,6 @@ MAX_HISTORY_CHARS = 36_000    # debate history (investment or risk)
 MAX_PAST_CONTEXT_CHARS = 24_000  # memory log past_context
 
 
-def truncate_text(text: str, max_chars: int) -> str:
-    """Truncate text to *max_chars*, appending a notice when trimmed."""
-    if not text or len(text) <= max_chars:
-        return text
-    return text[:max_chars] + f"\n[... truncated to {max_chars:,} chars]"
-
-
 # Import tools from separate utility files.  These MUST stay below the
 # constants above: each tool module does
 #   from tradingagents.agents.utils.agent_utils import MAX_TOOL_RESULT_CHARS
@@ -113,11 +113,22 @@ from tradingagents.agents.utils.news_data_tools import (  # noqa: E402
 from tradingagents.agents.utils.prediction_markets_tools import get_prediction_markets  # noqa: E402
 from tradingagents.agents.utils.technical_indicators_tools import get_indicators  # noqa: E402
 
+# Truncation helpers live in dataflows.text_truncation so the vendor-routing
+# layer (dataflows.interface.route_to_vendor) shares one implementation without
+# a circular import.  Re-exported here because the debate/researcher agents all
+# import them from agent_utils.
+from tradingagents.dataflows.text_truncation import (  # noqa: E402
+    truncate_series_text,
+    truncate_text,
+)
+
 # Public surface: the data tools are imported here so agents and the graph
 # import them from one place, plus the instrument/language helpers defined below.
 __all__ = [
     "get_stock_data",
     "get_indicators",
+    "truncate_text",
+    "truncate_series_text",
     "get_fundamentals",
     "get_balance_sheet",
     "get_cashflow",
