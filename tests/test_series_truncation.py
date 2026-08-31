@@ -206,3 +206,48 @@ def test_double_truncation_cannot_resurrect_dropped_rows():
     text, rows = _series()
     already_lost = truncate_text(text, MAX)  # what the old router produced
     assert rows[-1] not in truncate_series_text(already_lost, MAX)
+
+
+# --- The cap must hold for real -------------------------------------------
+#
+# The note quotes row keys, so its length is data-dependent; the internal
+# reserve is an estimate. #12's context-budget guard (tests/test_context_budget.py)
+# derives the analyst-phase worst case from MAX_TOOL_RESULT_CHARS on the
+# assumption that a tool result never exceeds it, so this is load-bearing.
+
+
+@pytest.mark.parametrize("key_width", [10, 40, 200, 2_000])
+def test_output_never_exceeds_max_chars_for_any_key_width(key_width):
+    """A pathologically wide first column must not push the result over."""
+    rows = [
+        f"{str(i).rjust(key_width, 'K')},{100 + i}.0,{101 + i}.0,{99 + i}.0,{100 + i}.5,{1000 + i}"
+        for i in range(5_000)
+    ]
+    text = "# hdr\n\nKey,Open,High,Low,Close,Volume\n" + "\n".join(rows)
+    out = truncate_series_text(text, MAX)
+    assert len(out) <= MAX, f"overflowed by {len(out) - MAX} chars at key_width={key_width}"
+    assert rows[-1][:MAX] in out or rows[-1] in out
+
+
+def test_series_result_respects_the_tool_result_cap():
+    """The budget guard's premise: a series result fits MAX_TOOL_RESULT_CHARS."""
+    text, _ = _series()
+    assert len(truncate_series_text(text, MAX_TOOL_RESULT_CHARS)) <= MAX_TOOL_RESULT_CHARS
+
+
+def test_series_truncation_does_not_loosen_the_context_budget():
+    """Downsampling changes WHICH rows survive, not how many chars do.
+
+    #12 anchors _analyst_phase_tokens() on MAX_TOOL_RESULT_CHARS. If series
+    truncation could return more than that, the analyst-phase estimate would be
+    understated and the worst-case prompt could exceed DeepSeek's context.
+    """
+    from tradingagents.dataflows import interface
+
+    text, _ = _series()
+    head = truncate_text(text, MAX_TOOL_RESULT_CHARS)
+    series = truncate_series_text(text, MAX_TOOL_RESULT_CHARS)
+    # The old head path actually ran slightly OVER the cap (notice appended
+    # after the slice); the new path stays at or under it.
+    assert len(series) <= MAX_TOOL_RESULT_CHARS <= len(head)
+    assert len(series) <= interface._MAX_TOOL_CHARS

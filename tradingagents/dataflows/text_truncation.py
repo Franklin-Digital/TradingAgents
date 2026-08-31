@@ -98,14 +98,19 @@ def _has_numeric_column(header: str, sample: list[str]) -> bool:
     The leading column is excluded because it is the timestamp/date key.
     """
     n_cols = header.count(",") + 1
-    for col in range(1, n_cols):
-        if all(_is_number(r.split(",")[col]) for r in sample):
-            return True
-    return False
+    return any(
+        all(_is_number(r.split(",")[col]) for r in sample)
+        for col in range(1, n_cols)
+    )
+
+
+_MAX_KEY_CHARS = 40  # keeps the note's quoted timestamps inside the reserve
 
 
 def _first_field(row: str) -> str:
-    return row.split(",", 1)[0].strip()
+    """The row's key (timestamp/date), clipped so the note stays bounded."""
+    key = row.split(",", 1)[0].strip()
+    return key[:_MAX_KEY_CHARS]
 
 
 def _evenly_spaced(items: list, n: int) -> list:
@@ -200,8 +205,19 @@ def truncate_series_text(
     note.append("# The last row is the most recent observation available.")
 
     parts = [fixed, *note]
+    first_row_idx = len(parts)
     if sampled:
         parts.extend(sampled)
         parts.append("# --- full resolution from here ---")
     parts.extend(recent)
-    return "\n".join(parts)
+
+    # The note quotes row keys, so its length is data-dependent and the fixed
+    # reserve above is an estimate, not a guarantee. Enforce the cap for real by
+    # dropping the OLDEST emitted rows until it holds — the whole point of this
+    # function is that the recent end is what survives. Callers (and #12's
+    # budget guard) rely on the result never exceeding max_chars.
+    out = "\n".join(parts)
+    while len(out) > max_chars and len(parts) > first_row_idx + 1:
+        del parts[first_row_idx]
+        out = "\n".join(parts)
+    return out if len(out) <= max_chars else out[:max_chars]

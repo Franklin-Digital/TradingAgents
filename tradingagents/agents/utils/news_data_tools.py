@@ -2,7 +2,8 @@ from typing import Annotated
 
 from langchain_core.tools import tool
 
-from tradingagents.agents.utils.agent_utils import MAX_TOOL_RESULT_CHARS, truncate_text
+from tradingagents.agents.utils.agent_utils import MAX_TOOL_RESULT_CHARS
+from tradingagents.dataflows.text_truncation import truncate_text
 from tradingagents.dataflows.interface import route_to_vendor
 
 
