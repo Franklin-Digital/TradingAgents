@@ -64,6 +64,19 @@ def _price_df(prices, start="2026-01-05"):
     return pd.DataFrame({"Close": prices}, index=idx)
 
 
+def _price_csv(prices, start="2026-01-05"):
+    """OHLCV CSV in the shape franklinfinancial.get_stock_data returns.
+
+    The Franklin fork routes realized-return lookups through the licensed data
+    interface, never yfinance, so these tests patch that boundary.
+    """
+    idx = pd.date_range(start=start, periods=len(prices), freq="D")
+    rows = "\n".join(
+        f"{d.strftime('%Y-%m-%d')},{p},{p},{p},{p},1000" for d, p in zip(idx, prices)
+    )
+    return "Datetime,Open,High,Low,Close,Volume\n" + rows + ("\n" if rows else "")
+
+
 def _make_pm_state(past_context=""):
     """Minimal AgentState dict for portfolio_manager_node."""
     return {
@@ -495,12 +508,12 @@ class TestDeferredReflection:
         stock_prices = [100.0, 102.0, 104.0, 103.0, 105.0, 106.0]
         spy_prices   = [400.0, 402.0, 404.0, 403.0, 405.0, 406.0]
         mock_graph = MagicMock(spec=TradingAgentsGraph)
-        with patch("yfinance.Ticker") as mock_ticker_cls:
-            def _make_ticker(sym):
-                m = MagicMock()
-                m.history.return_value = _price_df(spy_prices if sym == "SPY" else stock_prices)
-                return m
-            mock_ticker_cls.side_effect = _make_ticker
+        with patch(
+            "tradingagents.dataflows.franklinfinancial.get_stock_data"
+        ) as mock_get:
+            mock_get.side_effect = lambda sym, *a, **k: _price_csv(
+                spy_prices if sym == "SPY" else stock_prices
+            )
             raw, alpha, days, resolved = TradingAgentsGraph._fetch_returns(mock_graph, "NVDA", "2026-01-05")
         assert raw is not None and alpha is not None and days is not None
         assert isinstance(raw, float) and isinstance(alpha, float) and isinstance(days, int)
@@ -511,20 +524,20 @@ class TestDeferredReflection:
     def test_fetch_returns_too_recent(self):
         """Only 1 data point available → returns all-None, no crash."""
         mock_graph = MagicMock(spec=TradingAgentsGraph)
-        with patch("yfinance.Ticker") as mock_ticker_cls:
-            m = MagicMock()
-            m.history.return_value = _price_df([100.0])
-            mock_ticker_cls.return_value = m
+        with patch(
+            "tradingagents.dataflows.franklinfinancial.get_stock_data",
+            return_value=_price_csv([100.0]),
+        ):
             raw, alpha, days, resolved = TradingAgentsGraph._fetch_returns(mock_graph, "NVDA", "2026-04-19")
         assert (raw, alpha, days, resolved) == (None, None, None, None)
 
     def test_fetch_returns_delisted(self):
         """Empty DataFrame → returns all-None, no crash."""
         mock_graph = MagicMock(spec=TradingAgentsGraph)
-        with patch("yfinance.Ticker") as mock_ticker_cls:
-            m = MagicMock()
-            m.history.return_value = pd.DataFrame({"Close": []})
-            mock_ticker_cls.return_value = m
+        with patch(
+            "tradingagents.dataflows.franklinfinancial.get_stock_data",
+            return_value="Datetime,Open,High,Low,Close,Volume\n",
+        ):
             raw, alpha, days, resolved = TradingAgentsGraph._fetch_returns(mock_graph, "XXXXXFAKE", "2026-01-10")
         assert (raw, alpha, days, resolved) == (None, None, None, None)
 
@@ -534,12 +547,12 @@ class TestDeferredReflection:
         stock_prices = [100.0, 102.0, 104.0, 103.0, 105.0, 106.0, 107.0, 108.0]  # 8 rows
         spy_prices   = [400.0, 402.0, 403.0, 405.0, 406.0, 407.0]                # 6 rows
         mock_graph = MagicMock(spec=TradingAgentsGraph)
-        with patch("yfinance.Ticker") as mock_ticker_cls:
-            def _make_ticker(sym):
-                m = MagicMock()
-                m.history.return_value = _price_df(spy_prices if sym == "SPY" else stock_prices)
-                return m
-            mock_ticker_cls.side_effect = _make_ticker
+        with patch(
+            "tradingagents.dataflows.franklinfinancial.get_stock_data"
+        ) as mock_get:
+            mock_get.side_effect = lambda sym, *a, **k: _price_csv(
+                spy_prices if sym == "SPY" else stock_prices
+            )
             raw, alpha, days, resolved = TradingAgentsGraph._fetch_returns(mock_graph, "NVDA", "2026-01-05")
         assert raw is not None and alpha is not None
         assert days == 5  # full holding window used for both series
@@ -552,12 +565,12 @@ class TestDeferredReflection:
         stock_prices = [100.0, 102.0, 104.0]  # only 3 rows; holding window is 5
         spy_prices   = [400.0, 402.0, 404.0]
         mock_graph = MagicMock(spec=TradingAgentsGraph)
-        with patch("yfinance.Ticker") as mock_ticker_cls:
-            def _make_ticker(sym):
-                m = MagicMock()
-                m.history.return_value = _price_df(spy_prices if sym == "SPY" else stock_prices)
-                return m
-            mock_ticker_cls.side_effect = _make_ticker
+        with patch(
+            "tradingagents.dataflows.franklinfinancial.get_stock_data"
+        ) as mock_get:
+            mock_get.side_effect = lambda sym, *a, **k: _price_csv(
+                spy_prices if sym == "SPY" else stock_prices
+            )
             result = TradingAgentsGraph._fetch_returns(mock_graph, "NVDA", "2026-01-05")
         assert result == (None, None, None, None)
 

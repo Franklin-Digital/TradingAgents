@@ -558,11 +558,16 @@ class TestFetchReturns:
 
         with patch("tradingagents.dataflows.franklinfinancial.get_stock_data") as mock_get:
             mock_get.side_effect = [stock_csv, spy_csv]
-            raw, alpha, days = self._make_graph()._fetch_returns("NVDA", "2026-07-07", holding_days=2)
+            raw, alpha, days, resolved = self._make_graph()._fetch_returns(
+                "NVDA", "2026-07-07", holding_days=2
+            )
 
         assert raw is not None
         assert alpha is not None
         assert days == 2
+        # The resolution date is the last bar used — when the outcome became
+        # known (#1251). _parse_ohlcv_csv yields a Datetime column, not an index.
+        assert resolved == "2026-07-09"
         expected_raw = (104 - 100) / 100
         expected_spy = (453 - 450) / 450
         assert abs(raw - expected_raw) < 0.001
@@ -571,11 +576,14 @@ class TestFetchReturns:
     def test_returns_none_when_insufficient_data(self):
         with patch("tradingagents.dataflows.franklinfinancial.get_stock_data") as mock_get:
             mock_get.return_value = "# No data\nDatetime,Open,High,Low,Close,Volume\n"
-            raw, alpha, days = self._make_graph()._fetch_returns("RKLB", "2026-07-12", holding_days=5)
+            raw, alpha, days, resolved = self._make_graph()._fetch_returns(
+                "RKLB", "2026-07-12", holding_days=5
+            )
 
         assert raw is None
         assert alpha is None
         assert days is None
+        assert resolved is None
 
     def test_returns_none_when_start_close_is_zero(self):
         stock_csv = (
@@ -590,13 +598,17 @@ class TestFetchReturns:
         )
         with patch("tradingagents.dataflows.franklinfinancial.get_stock_data") as mock_get:
             mock_get.side_effect = [stock_csv, spy_csv]
-            raw, alpha, days = self._make_graph()._fetch_returns("NVDA", "2026-07-07", holding_days=1)
+            raw, alpha, days, resolved = self._make_graph()._fetch_returns(
+                "NVDA", "2026-07-07", holding_days=1
+            )
         assert raw is None
+        assert resolved is None
 
     def test_returns_none_on_exception(self):
         with patch("tradingagents.dataflows.franklinfinancial.get_stock_data", side_effect=RuntimeError("boom")):
-            raw, alpha, days = self._make_graph()._fetch_returns("NVDA", "2026-07-07")
+            raw, alpha, days, resolved = self._make_graph()._fetch_returns("NVDA", "2026-07-07")
         assert raw is None
+        assert resolved is None
 
 
 # ---------------------------------------------------------------------------

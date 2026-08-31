@@ -19,8 +19,14 @@ class DataflowsConfigIsolationTests(unittest.TestCase):
         cfg["data_vendors"]["core_stock_apis"] = "alpha_vantage"
         cfg["tool_vendors"]["get_stock_data"] = "alpha_vantage"
 
+        # Assert against the shipped default rather than a literal vendor name:
+        # this test is about reference isolation, not about which vendor the
+        # fork configures (Franklin defaults to "franklin", upstream "yfinance").
         fresh = get_config()
-        self.assertEqual(fresh["data_vendors"]["core_stock_apis"], "yfinance")
+        self.assertEqual(
+            fresh["data_vendors"]["core_stock_apis"],
+            default_config.DEFAULT_CONFIG["data_vendors"]["core_stock_apis"],
+        )
         self.assertNotIn("get_stock_data", fresh["tool_vendors"])
 
     def test_set_config_does_not_alias_caller_nested_dicts(self):
@@ -48,9 +54,9 @@ class DataflowsConfigIsolationTests(unittest.TestCase):
 
         fresh = get_config()
         self.assertEqual(fresh["data_vendors"]["core_stock_apis"], "alpha_vantage")
-        self.assertEqual(fresh["data_vendors"]["technical_indicators"], "yfinance")
-        self.assertEqual(fresh["data_vendors"]["fundamental_data"], "yfinance")
-        self.assertEqual(fresh["data_vendors"]["news_data"], "yfinance")
+        defaults = default_config.DEFAULT_CONFIG["data_vendors"]
+        for untouched in ("technical_indicators", "fundamental_data", "news_data"):
+            self.assertEqual(fresh["data_vendors"][untouched], defaults[untouched])
 
     def test_nested_dict_updates_merge_one_level_deep(self):
         set_config({"tool_vendors": {"get_stock_data": "alpha_vantage"}})

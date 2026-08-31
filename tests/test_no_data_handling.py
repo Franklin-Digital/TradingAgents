@@ -9,14 +9,32 @@ Covers two systematic fixes:
 
 import os
 import unittest
+from contextlib import contextmanager
 from unittest import mock
 
 import pandas as pd
 import pytest
 
 from tradingagents.dataflows import interface, stockstats_utils
-from tradingagents.dataflows.config import set_config
+from tradingagents.dataflows.config import get_config, set_config
 from tradingagents.dataflows.symbol_utils import NoMarketDataError
+
+
+@contextmanager
+def _vendor_chain(chain: str):
+    """Pin ``core_stock_apis`` to an explicit vendor chain for the block.
+
+    route_to_vendor honours the CONFIGURED chain, so a test that patches
+    VENDOR_METHODS must also name those vendors — otherwise it silently
+    depends on whatever the shipped default happens to be (the Franklin fork
+    defaults to "franklin", upstream to "yfinance").
+    """
+    previous = get_config().get("data_vendors", {}).get("core_stock_apis")
+    set_config({"data_vendors": {"core_stock_apis": chain}})
+    try:
+        yield
+    finally:
+        set_config({"data_vendors": {"core_stock_apis": previous}})
 
 
 @pytest.mark.unit
@@ -55,7 +73,7 @@ class TestRouteToVendorSentinel(unittest.TestCase):
         patched = {"yfinance": raises_no_data, "alpha_vantage": raises_no_data}
         with mock.patch.dict(
             interface.VENDOR_METHODS, {"get_stock_data": patched}, clear=False
-        ):
+        ), _vendor_chain("yfinance,alpha_vantage"):
             result = interface.route_to_vendor(
                 "get_stock_data", "XAUUSD+", "2026-01-01", "2026-01-10"
             )
@@ -77,7 +95,7 @@ class TestRouteToVendorSentinel(unittest.TestCase):
         patched = {"yfinance": raises_no_data, "alpha_vantage": raises_unavailable}
         with mock.patch.dict(
             interface.VENDOR_METHODS, {"get_stock_data": patched}, clear=False
-        ):
+        ), _vendor_chain("yfinance,alpha_vantage"):
             result = interface.route_to_vendor(
                 "get_stock_data", "FAKE", "2026-01-01", "2026-01-10"
             )
