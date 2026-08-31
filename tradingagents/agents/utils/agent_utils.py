@@ -145,12 +145,39 @@ def _split_series(text: str) -> tuple[list[str], str, list[str]] | None:
     rows = [ln for ln in lines[i + 1:] if ln.strip()]
     if len(rows) < 3:
         return None
-    # Guard against prose that happens to contain a comma: real data rows carry
-    # the same field count as the header.
+    # Guard against prose that happens to contain commas ("revenue grew,
+    # margins held, guidance raised"). Two checks, both required:
+    #   1. data rows carry the same field count as the header, and
+    #   2. at least one non-leading column is numeric across the sample.
+    # Every series we truncate (OHLCV, indicator tables) has numeric columns;
+    # comma-laden prose does not.
     want = header.count(",")
-    if sum(1 for r in rows[:20] if r.count(",") == want) < min(3, len(rows)):
+    sample = rows[:20]
+    if sum(1 for r in sample if r.count(",") == want) < len(sample):
+        return None
+    if not _has_numeric_column(header, sample):
         return None
     return preamble, header, rows
+
+
+def _is_number(value: str) -> bool:
+    try:
+        float(value.strip())
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
+def _has_numeric_column(header: str, sample: list[str]) -> bool:
+    """True when some non-leading column is numeric in every sampled row.
+
+    The leading column is excluded because it is the timestamp/date key.
+    """
+    n_cols = header.count(",") + 1
+    for col in range(1, n_cols):
+        if all(_is_number(r.split(",")[col]) for r in sample):
+            return True
+    return False
 
 
 def _first_field(row: str) -> str:
