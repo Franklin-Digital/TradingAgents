@@ -3,7 +3,7 @@
 import re
 from pathlib import Path
 
-from tradingagents.agents.utils.rating import parse_rating
+from tradingagents.agents.utils.rating import RATING_REVIEW, extract_rating
 
 
 class TradingMemoryLog:
@@ -42,7 +42,11 @@ class TradingMemoryLog:
             for line in raw.splitlines():
                 if line.startswith(f"[{trade_date} | {ticker} |") and line.endswith("| pending]"):
                     return
-        rating = parse_rating(final_trade_decision)
+        # An unparseable (or empty/truncated) decision is tagged REVIEW, not
+        # Hold. The old ``parse_rating`` default wrote a fabricated ``Hold`` that
+        # was indistinguishable from a real neutral call, and fed that fiction
+        # back into future runs as "past context".
+        rating = extract_rating(final_trade_decision) or RATING_REVIEW
         tag = f"[{trade_date} | {ticker} | {rating} | pending]"
         entry = f"{tag}\n\nDECISION:\n{final_trade_decision}{self._SEPARATOR}"
         with open(self._log_path, "a", encoding="utf-8") as f:
