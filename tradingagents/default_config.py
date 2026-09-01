@@ -44,8 +44,17 @@ BIFROST_QUICK_MODEL = os.getenv("BIFROST_QUICK_MODEL", BIFROST_DEFAULT_MODEL)
 # the OpenAI SDK's extra_body. Unset/empty => the key is omitted entirely and
 # the request body is unchanged. Opting in is explicit; no default here.
 BIFROST_FALLBACK_MODELS = os.getenv("BIFROST_FALLBACK_MODELS", "")
-# Provider Tauric uses to reach Bifrost. "openrouter" routes to DeepSeek Cloud
-# (prod default). vLLM local retired 2026-06-26 — GPU reclaimed for PyTorch.
+# DO NOT "clean this up" to say nemotron. This is the Tauric CLIENT type --
+# which OpenAI-compatible client class to construct -- NOT the Bifrost route.
+# Bifrost routes on the model id's prefix (BIFROST_MODEL above), so Nemotron is
+# selected by "nemotron/..." while this string stays "openrouter".
+#
+# Nemotron replaced OpenRouter as the serving provider on 2026-09-01, which
+# makes this line a trap: the obvious edit is to change it to match, and that
+# breaks every call by constructing a client that does not exist. The name is
+# historical, not a statement about who serves the tokens.
+#
+# vLLM local retired 2026-06-26 — GPU reclaimed for PyTorch.
 BIFROST_PROVIDER = os.getenv("BIFROST_PROVIDER", "openrouter")
 
 
