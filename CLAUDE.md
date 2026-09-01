@@ -20,8 +20,8 @@ Local vLLM/Llama on DGX retired 2026-06-26 — GPU reclaimed for PyTorch signal 
 ```python
 config = DEFAULT_CONFIG.copy()
 config["llm_provider"]    = "openrouter"
-config["deep_think_llm"]  = "deepseek/deepseek-chat"
-config["quick_think_llm"] = "deepseek/deepseek-chat"
+config["deep_think_llm"]  = "nemotron/nemotron-3.5-lightning"
+config["quick_think_llm"] = "nemotron/nemotron-3.5-lightning"
 ```
 
 Gateway endpoint: `http://localhost:8080/v1` (Bifrost on mac-pro).
@@ -81,8 +81,8 @@ from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
 config = DEFAULT_CONFIG.copy()
 config['llm_provider']    = 'openrouter'
-config['deep_think_llm']  = 'deepseek/deepseek-chat'
-config['quick_think_llm'] = 'deepseek/deepseek-chat'
+config['deep_think_llm']  = 'nemotron/nemotron-3.5-lightning'
+config['quick_think_llm'] = 'nemotron/nemotron-3.5-lightning'
 ta = TradingAgentsGraph(config=config)
 state, decision = ta.propagate('NVDA', '2026-05-13')
 print(decision)
