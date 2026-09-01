@@ -7,14 +7,21 @@ It runs multi-agent LLM analysis on scanner-filtered symbols and writes decision
 
 ### LLM Provider
 
-Franklin runs **DeepSeek Cloud** via OpenRouter through the Bifrost AI Gateway (mac-pro).
+Franklin runs **Nemotron** (`nemotron/nemotron-3.5-lightning`, self-hosted on the DGX)
+through the Bifrost AI Gateway (mac-pro). Nemotron replaced OpenRouter/DeepSeek as the
+serving provider on 2026-09-01.
+
+> `BIFROST_PROVIDER` still reads `openrouter` and **must stay that way** — it is the
+> Tauric client type, not the Bifrost route. Bifrost routes on the model id prefix
+> (`nemotron/...`). Changing it to match the provider name breaks every call.
+
 Local vLLM/Llama on DGX retired 2026-06-26 — GPU reclaimed for PyTorch signal engine.
 
 ```python
 config = DEFAULT_CONFIG.copy()
 config["llm_provider"]    = "openrouter"
-config["deep_think_llm"]  = "deepseek/deepseek-chat"
-config["quick_think_llm"] = "deepseek/deepseek-chat"
+config["deep_think_llm"]  = "nemotron/nemotron-3.5-lightning"
+config["quick_think_llm"] = "nemotron/nemotron-3.5-lightning"
 ```
 
 Gateway endpoint: `http://localhost:8080/v1` (Bifrost on mac-pro).
@@ -74,8 +81,8 @@ from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
 config = DEFAULT_CONFIG.copy()
 config['llm_provider']    = 'openrouter'
-config['deep_think_llm']  = 'deepseek/deepseek-chat'
-config['quick_think_llm'] = 'deepseek/deepseek-chat'
+config['deep_think_llm']  = 'nemotron/nemotron-3.5-lightning'
+config['quick_think_llm'] = 'nemotron/nemotron-3.5-lightning'
 ta = TradingAgentsGraph(config=config)
 state, decision = ta.propagate('NVDA', '2026-05-13')
 print(decision)

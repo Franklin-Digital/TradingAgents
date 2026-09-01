@@ -21,8 +21,18 @@ BIFROST_BASE_URL = os.getenv(
 # Default model id Bifrost routes to the DGX vLLM deployment. A DEFAULT, not a
 # hardcode — override with BIFROST_MODEL, or per-tier with BIFROST_DEEP_MODEL /
 # BIFROST_QUICK_MODEL, to point at any model Bifrost serves.
+#
+# This default is the ONLY thing that decides the model for scheduled runs.
+# scripts/ai-score-prod sources common/ai-score-common, which exports
+# BIFROST_MODEL=nemotron/... — but dispatcher-portfolio-prod invokes
+# `python -m integration.universe_dispatcher` DIRECTLY and never sources that
+# shell, so it fell through to this line. On 2026-09-01 that sent the nightly
+# portfolio re-score to OpenRouter/DeepSeek, which was out of credits: 402 on
+# every call, 15/15 symbols failed. "Nemotron is primary" was true only for
+# manual runs; the scheduled path had never been switched. Keeping the two
+# paths on the same default is the point — do not re-split them.
 BIFROST_DEFAULT_MODEL = os.getenv(
-    "BIFROST_MODEL", "deepseek/deepseek-chat"
+    "BIFROST_MODEL", "nemotron/nemotron-3.5-lightning"
 )
 BIFROST_DEEP_MODEL = os.getenv("BIFROST_DEEP_MODEL", BIFROST_DEFAULT_MODEL)
 BIFROST_QUICK_MODEL = os.getenv("BIFROST_QUICK_MODEL", BIFROST_DEFAULT_MODEL)
@@ -34,8 +44,17 @@ BIFROST_QUICK_MODEL = os.getenv("BIFROST_QUICK_MODEL", BIFROST_DEFAULT_MODEL)
 # the OpenAI SDK's extra_body. Unset/empty => the key is omitted entirely and
 # the request body is unchanged. Opting in is explicit; no default here.
 BIFROST_FALLBACK_MODELS = os.getenv("BIFROST_FALLBACK_MODELS", "")
-# Provider Tauric uses to reach Bifrost. "openrouter" routes to DeepSeek Cloud
-# (prod default). vLLM local retired 2026-06-26 — GPU reclaimed for PyTorch.
+# DO NOT "clean this up" to say nemotron. This is the Tauric CLIENT type --
+# which OpenAI-compatible client class to construct -- NOT the Bifrost route.
+# Bifrost routes on the model id's prefix (BIFROST_MODEL above), so Nemotron is
+# selected by "nemotron/..." while this string stays "openrouter".
+#
+# Nemotron replaced OpenRouter as the serving provider on 2026-09-01, which
+# makes this line a trap: the obvious edit is to change it to match, and that
+# breaks every call by constructing a client that does not exist. The name is
+# historical, not a statement about who serves the tokens.
+#
+# vLLM local retired 2026-06-26 — GPU reclaimed for PyTorch.
 BIFROST_PROVIDER = os.getenv("BIFROST_PROVIDER", "openrouter")
 
 
