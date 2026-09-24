@@ -5,6 +5,7 @@ All API access is mocked, so these run without a network connection or a key.
 """
 import copy
 import unittest
+from datetime import datetime, timezone
 from unittest import mock
 
 import pytest
@@ -44,6 +45,23 @@ def _request_stub(meta=_META, obs=_OBS):
             return obs
         raise AssertionError(f"unexpected FRED path: {path}")
     return _impl
+
+
+def _freeze_utc(iso_utc):
+    """Patch fred.datetime so now(tz) resolves from a fixed UTC instant.
+
+    Freezing UTC rather than the local date is what makes these tests sensitive
+    to the timezone under test: the same instant is a different calendar day in
+    Eastern and Central, which is the whole defect.
+    """
+    instant = datetime.fromisoformat(iso_utc).replace(tzinfo=timezone.utc)
+
+    class _Frozen(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return instant.astimezone(tz) if tz else instant.replace(tzinfo=None)
+
+    return mock.patch.object(fred, "datetime", _Frozen)
 
 
 @pytest.mark.unit
@@ -166,6 +184,62 @@ class FredFormattingTests(unittest.TestCase):
         for path in ("series", "series/observations"):
             self.assertEqual(captured[path]["realtime_start"], "2025-09-30", path)
             self.assertEqual(captured[path]["realtime_end"], "2025-09-30", path)
+
+
+@pytest.mark.unit
+class FredVintageClampTests(unittest.TestCase):
+    """The ET trade date vs FRED's US/Central today.
+
+    FRED rejects a realtime bound later than its own today with an HTTP 400.
+    Between 00:00 and 01:00 ET the dispatcher's trade date is already tomorrow
+    in Chicago, which is when the nightly sweep lost macro data entirely.
+    """
+
+    def _vintage_for(self, curr_date, iso_utc):
+        captured = {}
+
+        def _capture(path, params):
+            captured[path] = params
+            return _META if path == "series" else _OBS
+
+        with _freeze_utc(iso_utc), mock.patch.object(
+            fred, "_request", side_effect=_capture
+        ):
+            fred.get_macro_data("cpi", curr_date, 90)
+        starts = {p["realtime_start"] for p in captured.values()}
+        ends = {p["realtime_end"] for p in captured.values()}
+        self.assertEqual(len(captured), 2)  # metadata AND observations
+        self.assertEqual(starts, ends)
+        self.assertEqual(len(starts), 1)
+        return starts.pop()
+
+    def test_fred_today_is_central_not_eastern(self):
+        # 04:30 UTC = 00:30 ET on the 23rd, but still 23:30 CT on the 22nd.
+        with _freeze_utc("2026-09-23T04:30:00"):
+            self.assertEqual(fred._fred_today(), "2026-09-22")
+
+    def test_trade_date_ahead_of_fred_today_is_clamped(self):
+        # The failing window. Without the clamp this sends realtime_start=
+        # 2026-09-23 to a FRED whose today is the 22nd, and FRED 400s.
+        self.assertEqual(
+            self._vintage_for("2026-09-23", "2026-09-23T04:30:00"),
+            "2026-09-22",
+        )
+
+    def test_same_day_after_the_window_is_not_clamped(self):
+        # 14:00 UTC = 09:00 ET / 08:00 CT: both agree, so nothing is clamped.
+        self.assertEqual(
+            self._vintage_for("2026-09-23", "2026-09-23T14:00:00"),
+            "2026-09-23",
+        )
+
+    def test_historical_dates_keep_their_vintage(self):
+        # The lookahead guarantee (#1275) must survive the clamp: a past
+        # curr_date is passed through untouched, never advanced to today.
+        self.assertEqual(
+            self._vintage_for("2025-06-02", "2026-09-23T14:00:00"),
+            "2025-06-02",
+        )
 
 
 @pytest.mark.unit
