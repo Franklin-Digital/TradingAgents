@@ -11,6 +11,7 @@ the routing layer treats it as "unavailable" rather than a hard crash.
 import logging
 import os
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -19,6 +20,13 @@ from .errors import VendorNotConfiguredError
 logger = logging.getLogger(__name__)
 
 FRED_API_BASE = "https://api.stlouisfed.org/fred"
+
+# FRED validates the realtime bounds against ITS OWN today, and FRED is the St.
+# Louis Fed -- US Central. Ours is a third date authority alongside mac-pro's
+# Pacific wall clock and the market's Eastern trade date, so between 00:00 and
+# 01:00 ET the dispatcher's trade date is already tomorrow in Chicago and every
+# request 400s. See _vintage_bounds.
+FRED_TZ = ZoneInfo("America/Chicago")
 
 # Network timeout (seconds) so a stalled request can't hang the agents,
 # mirroring the Alpha Vantage client.
@@ -115,6 +123,38 @@ def _resolve_series_id(indicator: str) -> str:
     return candidate
 
 
+def _fred_today() -> str:
+    """Today's date in FRED's own timezone (yyyy-mm-dd)."""
+    return datetime.now(FRED_TZ).strftime("%Y-%m-%d")
+
+
+def _vintage_bounds(curr_date: str) -> dict:
+    """Realtime bounds pinning the data vintage, clamped to FRED's today.
+
+    Pinning ``realtime_start = realtime_end = curr_date`` is what keeps a
+    historical run lookahead-safe (#1275). But ``curr_date`` is the trade date
+    in US/Eastern, while FRED validates these bounds against its own US/Central
+    today and rejects anything later with an HTTP 400. Between 00:00 and 01:00
+    ET the two disagree by a calendar day, so the nightly sweep lost macro data
+    for every symbol it scored in that hour -- 191 failures on 2026-09-21 and
+    140 on 2026-09-23, each degrading silently to the DATA_UNAVAILABLE sentinel.
+
+    Clamping is the correct semantic as well as the working one: there is no
+    such thing as a future vintage, so the newest data FRED can serve for a
+    forward-dated request is simply its latest. Past dates are untouched, which
+    is what preserves the lookahead guarantee.
+    """
+    vintage = min(curr_date, _fred_today())
+    if vintage != curr_date:
+        logger.info(
+            "FRED vintage %s is ahead of FRED's today %s (ET/Central skew); "
+            "clamping to the latest available vintage.",
+            curr_date,
+            vintage,
+        )
+    return {"realtime_start": vintage, "realtime_end": vintage}
+
+
 def _request(path: str, params: dict) -> dict:
     """GET a FRED endpoint, surfacing FRED's JSON error body on a bad request."""
     api_params = {**params, "api_key": get_api_key(), "file_type": "json"}
@@ -148,7 +188,9 @@ def get_macro_data(
             ``realtime_start = realtime_end = curr_date`` so a historical run sees
             the values that were actually published by that date, not later
             revisions. Without this, revision-prone series (CPI, GDP, ...) would
-            leak future information into a backtest (#1275).
+            leak future information into a backtest (#1275). A date later than
+            FRED's own today (US Central) is clamped to it, since no future
+            vintage exists and FRED 400s the request.
         look_back_days: Trailing window length; ``None`` uses DEFAULT_LOOKBACK_DAYS.
 
     Returns:
@@ -165,7 +207,8 @@ def get_macro_data(
     # today, which serves the LATEST revision of every observation; a single-day
     # realtime interval asks for the values known as of curr_date instead. This
     # is applied to both the metadata and observations requests (#1275).
-    realtime = {"realtime_start": curr_date, "realtime_end": curr_date}
+    # Clamped to FRED's own today, which is US Central -- see _vintage_bounds.
+    realtime = _vintage_bounds(curr_date)
 
     # Invalid LLM-supplied indicator: return guidance rather than raising, so a
     # bad argument doesn't abort the run (the routing layer also degrades macro
