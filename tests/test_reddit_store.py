@@ -8,7 +8,6 @@ to live Reddit search (which is what 429'd every run).
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
 from urllib.error import HTTPError
 from urllib.parse import parse_qs, urlparse
 
