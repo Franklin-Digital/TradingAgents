@@ -11,6 +11,13 @@ import pytest
 
 from tradingagents.dataflows import reddit
 
+
+@pytest.fixture(autouse=True)
+def _live_reddit_source(monkeypatch):
+    # These tests exercise the LIVE Reddit search path, which is opt-in since
+    # the default moved to Franklin's Reddit store (DAYTRADE-1040).
+    monkeypatch.setenv("REDDIT_SOURCE", "live")
+
 _SAMPLE_ATOM = """<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
   <entry>

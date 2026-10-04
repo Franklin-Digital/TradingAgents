@@ -16,6 +16,13 @@ from tradingagents.dataflows import reddit, stocktwits
 from tradingagents.dataflows.date_window import in_window
 
 
+@pytest.fixture(autouse=True)
+def _live_reddit_source(monkeypatch):
+    # These tests exercise the LIVE Reddit search path, which is opt-in since
+    # the default moved to Franklin's Reddit store (DAYTRADE-1040).
+    monkeypatch.setenv("REDDIT_SOURCE", "live")
+
+
 class _JsonResp:
     """Minimal urlopen() context-manager stub returning a JSON body."""
 

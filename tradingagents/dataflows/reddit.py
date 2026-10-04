@@ -1,6 +1,17 @@
-"""Reddit search fetcher for ticker-specific discussion posts.
+"""Reddit discussion posts for a ticker.
 
-Default path is Reddit's public Atom/RSS search feed
+DEFAULT SOURCE: Franklin's Reddit store (DAYTRADE-1040). The franklin-reddit
+collector polls r/wallstreetbets, r/stocks and r/investing every 10 minutes
+into Postgres, and franklin-api serves ``GET /social/reddit/{symbol}``. The
+live per-symbol search below made ~2,300 Reddit requests per 777-symbol run
+from one public IP and was HTTP-429'd on most of them, so most symbols were
+scored with no Reddit input at all. ``REDDIT_SOURCE=live`` restores it.
+
+If the store cannot be read, the analyst gets an explicit "unavailable"
+placeholder. It NEVER falls back to live search on its own: a silent
+fallback would bring back the 429 storm with nothing saying so.
+
+LIVE SOURCE (``REDDIT_SOURCE=live``): the original path. Its default is Reddit's public Atom/RSS search feed
 (``reddit.com/r/{sub}/search.rss``). The richer JSON search endpoint
 (``/search.json``) is reliably WAF-blocked (``HTTP 403``) for public clients
 (issue #862), and probing it on every call only doubled our request volume
@@ -21,13 +32,14 @@ import html
 import http.client
 import json
 import logging
+import os
 import re
 import time
 import xml.etree.ElementTree as ET
 from collections.abc import Iterable
 from datetime import datetime, timezone
 from urllib.error import HTTPError
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 from .date_window import in_window
@@ -208,7 +220,7 @@ def _fetch_subreddit(
     return _fetch_subreddit_rss(ticker, sub, limit, timeout)
 
 
-def fetch_reddit_posts(
+def _fetch_reddit_posts_live(
     ticker: str,
     subreddits: Iterable[str] = DEFAULT_SUBREDDITS,
     limit_per_sub: int = 5,
@@ -275,3 +287,105 @@ def fetch_reddit_posts(
             f"{', '.join(f'r/{s}' for s in subreddits)} in the past 7 days>"
         )
     return "\n\n".join(blocks)
+
+
+# ── Franklin's Reddit store (default) ─────────────────────────────────────────
+
+_STORE_DEFAULT_URL = "http://localhost:8070"      # franklin-api prod on mac-pro
+
+
+def _store_get(symbol: str, params: dict, timeout: float) -> dict:
+    base = os.getenv("FRANKLIN_API_URL", _STORE_DEFAULT_URL).rstrip("/")
+    url = f"{base}/social/reddit/{quote(symbol)}?{urlencode(params)}"
+    with urlopen(Request(url, headers={"Accept": "application/json"}), timeout=timeout) as r:
+        return json.loads(r.read())
+
+
+def _fetch_reddit_posts_store(
+    ticker: str,
+    subreddits: Iterable[str],
+    limit_per_sub: int,
+    timeout: float,
+    start_date: str | None,
+    end_date: str | None,
+) -> str:
+    symbol = (crypto_base(ticker) or ticker).upper()
+    subs = [s.lower() for s in subreddits]
+    params = {"limit": 500}
+    if start_date:
+        params["from"] = f"{start_date}T00:00:00Z"
+    if end_date:
+        params["to"] = f"{end_date}T23:59:59.999999Z"
+        # A historical run reads the store AS IT WAS at the end of its window:
+        # posts we only collected later must not leak into a backtest (#1220).
+        if end_date < datetime.now(timezone.utc).strftime("%Y-%m-%d"):
+            params["as_of"] = f"{end_date}T23:59:59.999999Z"
+    try:
+        payload = _store_get(symbol, params, timeout)
+    except HTTPError as e:
+        logger.warning("Reddit store HTTP %s for %s", e.code, symbol)
+        return f"<Reddit data unavailable: Franklin's Reddit store returned HTTP {e.code}>"
+    except (OSError, ValueError, http.client.HTTPException) as e:
+        logger.warning("Reddit store unreachable for %s: %s", symbol, e)
+        return "<Reddit data unavailable: Franklin's Reddit store could not be reached>"
+
+    by_sub: dict[str, list[dict]] = {s: [] for s in subs}
+    for p in payload.get("data") or []:
+        sub = (p.get("subreddit") or "").lower()
+        if sub in by_sub:
+            by_sub[sub].append(p)
+
+    blocks, total = [], 0
+    for sub in subs:
+        posts = sorted(by_sub[sub], key=lambda p: p.get("created_utc") or "", reverse=True)
+        posts = posts[:limit_per_sub]
+        total += len(posts)
+        if not posts:
+            blocks.append(f"r/{sub}: <no posts found mentioning {symbol} in the past 7 days>")
+            continue
+        no_metrics = all(p.get("score") is None for p in posts)
+        header = f"r/{sub} — {len(posts)} recent posts mentioning {symbol}"
+        header += " (scores/comments unavailable):" if no_metrics else ":"
+        lines = [header]
+        for p in posts:
+            meta = (p.get("created_utc") or "?")[:10]
+            if p.get("score") is not None and p.get("num_comments") is not None:
+                meta += f" · {p['score']:>4}↑ · {p['num_comments']:>3}c"
+            if p.get("matched_in") == "body":
+                # A body-only mention is often a passing reference, not the topic.
+                meta += " · mentioned in body only"
+            title = (p.get("title") or "").replace("\n", " ").strip()
+            body = (p.get("body") or "").replace("\n", " ").strip()
+            if len(body) > 240:
+                body = body[:240] + "…"
+            lines.append(f"  [{meta}] {title}" + (f"\n    body excerpt: {body}" if body else ""))
+        blocks.append("\n".join(lines))
+
+    if total == 0:
+        return (f"<no Reddit posts found mentioning {symbol} across "
+                f"{', '.join(f'r/{s}' for s in subs)} in the past 7 days>")
+    return "\n\n".join(blocks)
+
+
+def fetch_reddit_posts(
+    ticker: str,
+    subreddits: Iterable[str] = DEFAULT_SUBREDDITS,
+    limit_per_sub: int = 5,
+    timeout: float = 10.0,
+    inter_request_delay: float = 1.0,
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> str:
+    """Recent Reddit posts mentioning ``ticker``, as a plaintext block.
+
+    Reads Franklin's Reddit store unless ``REDDIT_SOURCE=live``. Never raises:
+    a failure becomes a clear placeholder string.
+    """
+    source = os.getenv("REDDIT_SOURCE", "store").strip().lower()
+    if source == "live":
+        return _fetch_reddit_posts_live(ticker, subreddits, limit_per_sub, timeout,
+                                        inter_request_delay, start_date, end_date)
+    if source != "store":
+        logger.warning("REDDIT_SOURCE=%r is not 'store' or 'live'; using the store", source)
+    return _fetch_reddit_posts_store(ticker, subreddits, limit_per_sub, timeout,
+                                     start_date, end_date)
