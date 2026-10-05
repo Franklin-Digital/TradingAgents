@@ -67,7 +67,31 @@ _ALIASES = {
     "GER40": "^GDAXI", "GER30": "^GDAXI", "DE40": "^GDAXI",
     "UK100": "^FTSE", "JP225": "^N225", "JPN225": "^N225",
     "FRA40": "^FCHI", "EU50": "^STOXX50E", "HK50": "^HSI",
+    # US voting share classes. ``.V`` cannot be a rule below: it is Yahoo's
+    # TSX Venture exchange suffix (SHOP.V-style symbols must stay dotted).
+    "MKC.V": "MKC-V", "TYG.V": "TYG-V",
 }
+
+# US share-class and instrument suffixes in the DOTTED form IBKR, our universe
+# and most US feeds use. Yahoo spells them with a dash and, for warrants, units
+# and rights, a different code. Measured against Yahoo's chart API 2026-10-05:
+#
+#     BRK.B BF.B HEI.A AGM.A CIG.C   Not Found     BRK-B BF-B HEI-A AGM-A CIG-C  data
+#     BBAI.W -> BBAI-WT   ALUB.U -> ALUB-UN   AIIA.R -> AIIA-RI                  data
+#     VOD.L                                       data (exchange suffix: unchanged)
+#
+# None of these letters is a Yahoo exchange suffix, so the rule cannot mangle a
+# foreign listing.
+_US_DOTTED_SUFFIXES = {"A": "A", "B": "B", "C": "C", "W": "WT", "U": "UN", "R": "RI"}
+
+# Yahoo's own US exchange codes (quote meta ``exchangeName``). They are never
+# part of a Yahoo ticker, but an LLM tool call has appended one: ai-score run
+# #29 asked Yahoo for ``NEOV.NCM`` (404) when NEOV itself has data.
+_YAHOO_US_EXCHANGE_CODES = frozenset(
+    {"NCM", "NMS", "NGM", "NYQ", "NYS", "ASE", "PCX", "BTS", "NAS", "PNK"}
+)
+
+_DOTTED = re.compile(r"^([A-Z][A-Z0-9]{0,5})\.([A-Z]{1,3})$")
 
 # Yahoo symbols may contain letters, digits, and these structural characters.
 _YAHOO_SAFE = re.compile(r"^[A-Za-z0-9._\-\^=]+$")
@@ -105,7 +129,11 @@ def normalize_symbol(raw: str) -> str:
     """Map a user/broker symbol to its canonical Yahoo Finance symbol.
 
     Resolution order (first match wins):
-      1. Explicit alias table (metals, energy, index CFDs).
+      1. Explicit alias table (metals, energy, index CFDs, US voting classes).
+      1b. A Yahoo US exchange code wrongly appended (``NEOV.NCM``) is dropped.
+      1c. US dotted share classes / instruments -> Yahoo's dashed form
+          (``BRK.B`` -> ``BRK-B``, ``X.W`` -> ``X-WT``, ``.U`` -> ``-UN``,
+          ``.R`` -> ``-RI``). Foreign exchange suffixes (``VOD.L``) are kept.
       2. Crypto rule: a known crypto base quoted in USD/USDT/USDC (dashed or
          not) -> ``BASE-USD``.
       3. Forex rule: six letters that are two ISO currency codes -> ``PAIR=X``.
@@ -124,8 +152,13 @@ def normalize_symbol(raw: str) -> str:
     s = s.rstrip("+")
 
     crypto = _normalize_crypto(s)
+    dotted = _DOTTED.match(s)
     if s in _ALIASES:
         canonical = _ALIASES[s]
+    elif dotted and dotted.group(2) in _YAHOO_US_EXCHANGE_CODES:
+        canonical = dotted.group(1)
+    elif dotted and dotted.group(2) in _US_DOTTED_SUFFIXES:
+        canonical = f"{dotted.group(1)}-{_US_DOTTED_SUFFIXES[dotted.group(2)]}"
     elif crypto is not None:
         canonical = crypto
     elif len(s) == 6 and s[:3] in _FOREX_CURRENCIES and s[3:] in _FOREX_CURRENCIES:
