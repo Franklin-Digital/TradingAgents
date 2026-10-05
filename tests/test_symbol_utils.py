@@ -15,8 +15,34 @@ from tradingagents.dataflows.symbol_utils import (
 @pytest.mark.unit
 class TestNormalizeSymbol(unittest.TestCase):
     def test_plain_equities_unchanged(self):
-        for sym in ("AAPL", "MSFT", "TSM", "BRK.B", "0700.HK", "^GSPC", "GC=F"):
+        for sym in ("AAPL", "MSFT", "TSM", "BRK-B", "0700.HK", "^GSPC", "GC=F"):
             self.assertEqual(normalize_symbol(sym), sym)
+
+    def test_us_dotted_share_classes_get_yahoo_dash(self):
+        # Yahoo 404s the dotted form (measured 2026-10-05).
+        for raw, want in (("BRK.B", "BRK-B"), ("BF.B", "BF-B"), ("brk.a", "BRK-A"),
+                          ("HEI.A", "HEI-A"), ("CIG.C", "CIG-C")):
+            self.assertEqual(normalize_symbol(raw), want, raw)
+
+    def test_us_warrants_units_rights_use_yahoo_codes(self):
+        self.assertEqual(normalize_symbol("BBAI.W"), "BBAI-WT")
+        self.assertEqual(normalize_symbol("ALUB.U"), "ALUB-UN")
+        self.assertEqual(normalize_symbol("AIIA.R"), "AIIA-RI")
+
+    def test_voting_class_is_an_alias_not_a_rule(self):
+        # .V is Yahoo's TSX Venture suffix: only the known US voting classes map.
+        self.assertEqual(normalize_symbol("MKC.V"), "MKC-V")
+        self.assertEqual(normalize_symbol("SHOP.V"), "SHOP.V")
+
+    def test_foreign_exchange_suffixes_kept(self):
+        for sym in ("VOD.L", "RY.TO", "SAP.DE", "7203.T", "0700.HK"):
+            self.assertEqual(normalize_symbol(sym), sym)
+
+    def test_appended_yahoo_exchange_code_is_dropped(self):
+        # ai-score #29: an agent asked Yahoo for NEOV.NCM.
+        self.assertEqual(normalize_symbol("NEOV.NCM"), "NEOV")
+        self.assertEqual(normalize_symbol("aapl.nms"), "AAPL")
+        self.assertEqual(normalize_symbol("IBM.NYQ"), "IBM")
 
     def test_lowercases_are_upper(self):
         self.assertEqual(normalize_symbol("aapl"), "AAPL")
