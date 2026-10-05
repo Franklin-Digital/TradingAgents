@@ -12,7 +12,7 @@ concurrency:
 jobs:
   test:
     name: tests (py${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]  # mac-pro runner: GitHub-hosted Actions outage 2026-10-05; the DGX runner is ARM64
     strategy:
       fail-fast: false
       matrix:
@@ -31,7 +31,7 @@ jobs:
 
   smoke-install:
     name: clean-install smoke
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]  # mac-pro runner: GitHub-hosted Actions outage 2026-10-05; the DGX runner is ARM64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -47,7 +47,7 @@ jobs:
 
   lint:
     name: ruff (strict, full repo)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]  # mac-pro runner: GitHub-hosted Actions outage 2026-10-05; the DGX runner is ARM64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
